@@ -2,5 +2,8 @@ node_modules/
 .python/
 .worktrees/
 editor/dist/
+editor/src-tauri/gen/
+editor/src-tauri/layers/
+editor/src-tauri/target/
 psdexport/
 *_export/
