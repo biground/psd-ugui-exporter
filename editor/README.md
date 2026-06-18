@@ -42,11 +42,17 @@ npm run dev
 
 1. Enter the PSD/PSB path and cache directory.
 2. Click `Open PSD/PSB`.
-3. In the Source Tree, select one layer or Cmd/Ctrl-select multiple layers.
-4. Click `Create Export Node`.
-5. Use the Inspector to edit `name`, `enabled`, `exportKind`, and list settings.
-6. Save the `.psdui` file.
-7. Export `ui.layout.json`.
+3. In the Source Tree, select one layer or Cmd/Ctrl-select multiple source
+   layers.
+4. Click `Create Export Node`. When multiple source layers are selected, they
+   are merged into one export node instead of creating one node per source
+   layer.
+5. Use the Inspector to edit `name`, `enabled`, and `exportKind`.
+6. To manually mark a node as a list, set `exportKind` to `list` in the
+   Inspector, then configure `direction`, `spacing`, `cellTemplateNodeId`, and
+   `padding`.
+7. Save the `.psdui` file.
+8. Export `ui.layout.json`.
 
 ## Current Boundaries
 
