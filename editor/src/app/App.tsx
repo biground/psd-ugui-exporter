@@ -8,6 +8,7 @@ import { Inspector } from '../components/Inspector';
 import { SourceTree } from '../components/SourceTree';
 import { createLayoutDocument } from '../domain/layout-export';
 import type { ExportKind, ExportNode } from '../schemas/psdui';
+import { deriveDefaultProjectSettings, type ProjectSettings } from './project-settings';
 import {
   appendExportNode,
   createEmptyState,
@@ -23,11 +24,15 @@ import {
 
 type InputChangeEvent = { target: HTMLInputElement };
 type SelectChangeEvent = { target: HTMLSelectElement };
+type DetailsToggleEvent = { target: HTMLDetailsElement };
 
 export function App() {
   const [state, setState] = useState(createEmptyState);
-  const [projectPath, setProjectPath] = useState('');
-  const [layoutPath, setLayoutPath] = useState('');
+  const [projectSettings, setProjectSettings] = useState<ProjectSettings>({
+    projectPath: '',
+    layoutPath: ''
+  });
+  const [projectSettingsOpen, setProjectSettingsOpen] = useState(false);
   const [newExportKind, setNewExportKind] = useState<ExportKind>('image');
 
   const selectedExportNode = useMemo(() => {
@@ -71,11 +76,17 @@ export function App() {
       }
 
       const sourcePath = Array.isArray(selectedPath) ? selectedPath[0] : selectedPath;
+      if (sourcePath === undefined) {
+        throw new Error('No PSD/PSB file was selected.');
+      }
+
       const sourceDocument = await invoke<SourceDocumentInput>('open_psd', {
         sourcePath,
         cacheDir: null
       });
       const project = createProjectFromSourceDocument(sourceDocument);
+      setProjectSettings(deriveDefaultProjectSettings(project.source.path));
+      setProjectSettingsOpen(false);
 
       setState({
         project,
@@ -118,12 +129,12 @@ export function App() {
       if (state.project === null) {
         throw new Error('Open a PSD/PSB before saving.');
       }
-      if (projectPath.trim().length === 0) {
-        throw new Error('Enter a .psdui project path before saving.');
+      if (projectSettings.projectPath.trim().length === 0) {
+        throw new Error('Set a .psdui project path before saving.');
       }
 
-      await invoke('save_project', { projectPath, project: state.project });
-      setState((current) => ({ ...current, message: `Saved ${projectPath}.` }));
+      await invoke('save_project', { projectPath: projectSettings.projectPath, project: state.project });
+      setState((current) => ({ ...current, message: `Saved ${projectSettings.projectPath}.` }));
     });
   }
 
@@ -132,13 +143,13 @@ export function App() {
       if (state.project === null) {
         throw new Error('Open a PSD/PSB before exporting layout.');
       }
-      if (layoutPath.trim().length === 0) {
-        throw new Error('Enter a ui.layout.json path before exporting.');
+      if (projectSettings.layoutPath.trim().length === 0) {
+        throw new Error('Set a ui.layout.json path before exporting.');
       }
 
       const layout = createLayoutDocument(state.project);
-      await invoke('export_layout', { layoutPath, layout });
-      setState((current) => ({ ...current, message: `Exported ${layoutPath}.` }));
+      await invoke('export_layout', { layoutPath: projectSettings.layoutPath, layout });
+      setState((current) => ({ ...current, message: `Exported ${projectSettings.layoutPath}.` }));
     });
   }
 
@@ -153,83 +164,115 @@ export function App() {
   }
 
   const canCreateNode = state.project !== null && state.selectedSourceLayerIds.length > 0;
+  const project = state.project;
+  const hasProject = project !== null;
 
   return (
     <>
       <style>{appCss}</style>
-      <main className="app-shell">
-        <header className="toolbar">
-          <div className="path-grid">
-            <div className="source-summary">
-              <span>PSD/PSB source</span>
-              <strong>{state.project?.source.fileName ?? 'No file opened'}</strong>
-              <small>{state.project?.source.path ?? 'Click Open PSD/PSB to choose a file.'}</small>
-            </div>
-            <PathInput label="Project path" value={projectPath} onChange={setProjectPath} />
-            <PathInput label="Layout path" value={layoutPath} onChange={setLayoutPath} />
-          </div>
-          <div className="actions">
-            <button type="button" onClick={openPsd}>
+      <main className={`app-shell ${hasProject ? 'has-project' : 'is-empty'}`}>
+        {project === null ? (
+          <section className="empty-workspace">
+            <button type="button" className="open-file-hero" onClick={openPsd}>
               Open PSD/PSB
             </button>
-            <label className="compact-select">
-              <span>New node</span>
-              <select value={newExportKind} onChange={(event: SelectChangeEvent) => setNewExportKind(event.target.value as ExportKind)}>
-                <option value="image">image</option>
-                <option value="button">button</option>
-                <option value="group">group</option>
-                <option value="text">text</option>
-                <option value="list">list</option>
-              </select>
-            </label>
-            <button type="button" onClick={createExportNode} disabled={!canCreateNode}>
-              Create Export Node
-            </button>
-            <button type="button" onClick={saveProject} disabled={state.project === null}>
-              Save .psdui
-            </button>
-            <button type="button" onClick={exportLayout} disabled={state.project === null}>
-              Export Layout
-            </button>
-          </div>
-          <p className="message" role="status">
-            {state.message ?? 'Ready.'}
-          </p>
-        </header>
-        <section className="workspace">
-          <aside className="left-panel">
-            <section className="panel-section">
-              <h2>Source Tree</h2>
-              <SourceTree
-                layers={state.project?.sourceTree ?? []}
-                selectedLayerIds={state.selectedSourceLayerIds}
-                onSelectLayer={(layerId) =>
-                  setState((current) => selectSourceLayer(current, layerId))
-                }
-                onToggleLayerSelection={(layerId) =>
-                  setState((current) => toggleSourceLayerSelection(current, layerId))
-                }
+            <p className="message" role="status">
+              {state.message ?? 'Choose a Photoshop document to begin.'}
+            </p>
+          </section>
+        ) : (
+          <>
+            <header className="toolbar">
+              <div className="source-summary">
+                <span>PSD/PSB source</span>
+                <strong>{project.source.fileName}</strong>
+                <small>{project.source.path}</small>
+              </div>
+              <div className="actions">
+                <button type="button" onClick={openPsd}>
+                  Open Another
+                </button>
+                <label className="compact-select">
+                  <span>New node</span>
+                  <select value={newExportKind} onChange={(event: SelectChangeEvent) => setNewExportKind(event.target.value as ExportKind)}>
+                    <option value="image">image</option>
+                    <option value="button">button</option>
+                    <option value="group">group</option>
+                    <option value="text">text</option>
+                    <option value="list">list</option>
+                  </select>
+                </label>
+                <button type="button" onClick={createExportNode} disabled={!canCreateNode}>
+                  Create Export Node
+                </button>
+                <button type="button" onClick={saveProject}>
+                  Save .psdui
+                </button>
+                <button type="button" onClick={exportLayout}>
+                  Export Layout
+                </button>
+              </div>
+              <details
+                className="project-settings"
+                open={projectSettingsOpen}
+                onToggle={(event: DetailsToggleEvent) => setProjectSettingsOpen(event.target.open)}
+              >
+                <summary>Project Settings</summary>
+                <div className="project-settings-grid">
+                  <PathInput
+                    label="Project path"
+                    value={projectSettings.projectPath}
+                    onChange={(projectPath) => setProjectSettings((current) => ({ ...current, projectPath }))}
+                  />
+                  <PathInput
+                    label="Layout path"
+                    value={projectSettings.layoutPath}
+                    onChange={(layoutPath) => setProjectSettings((current) => ({ ...current, layoutPath }))}
+                  />
+                </div>
+              </details>
+              <p className="message" role="status">
+                {state.message ?? 'Ready.'}
+              </p>
+            </header>
+            <section className="workspace">
+              <aside className="tree-panel source-panel">
+                <section className="panel-section">
+                  <h2>Source Tree</h2>
+                  <SourceTree
+                    layers={project.sourceTree}
+                    selectedLayerIds={state.selectedSourceLayerIds}
+                    onSelectLayer={(layerId) =>
+                      setState((current) => selectSourceLayer(current, layerId))
+                    }
+                    onToggleLayerSelection={(layerId) =>
+                      setState((current) => toggleSourceLayerSelection(current, layerId))
+                    }
+                  />
+                </section>
+              </aside>
+              <aside className="tree-panel export-panel">
+                <section className="panel-section">
+                  <h2>Export Tree</h2>
+                  <ExportTree
+                    nodes={project.exportTree}
+                    selectedNodeId={state.selectedExportNodeId}
+                    onSelectNode={(nodeId) =>
+                      setState((current) => ({ ...current, selectedExportNodeId: nodeId }))
+                    }
+                  />
+                </section>
+              </aside>
+              <CanvasPreview
+                project={project}
+                selectedExportNodeId={state.selectedExportNodeId}
               />
+              <aside className="right-panel">
+                <Inspector node={selectedExportNode} onUpdateNode={updateSelectedExportNode} />
+              </aside>
             </section>
-            <section className="panel-section">
-              <h2>Export Tree</h2>
-              <ExportTree
-                nodes={state.project?.exportTree ?? []}
-                selectedNodeId={state.selectedExportNodeId}
-                onSelectNode={(nodeId) =>
-                  setState((current) => ({ ...current, selectedExportNodeId: nodeId }))
-                }
-              />
-            </section>
-          </aside>
-          <CanvasPreview
-            project={state.project}
-            selectedExportNodeId={state.selectedExportNodeId}
-          />
-          <aside className="right-panel">
-            <Inspector node={selectedExportNode} onUpdateNode={updateSelectedExportNode} />
-          </aside>
-        </section>
+          </>
+        )}
       </main>
     </>
   );
@@ -291,18 +334,39 @@ button:disabled {
   grid-template-rows: auto 1fr;
 }
 
+.app-shell.is-empty {
+  grid-template-rows: 1fr;
+}
+
+.empty-workspace {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 16px;
+  padding: 32px;
+}
+
+.open-file-hero {
+  min-width: min(360px, calc(100vw - 48px));
+  min-height: 88px;
+  border-color: #7aa8e8;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 12px 36px rgba(37, 99, 235, 0.14);
+  color: #1d4ed8;
+  font-size: 22px;
+  font-weight: 750;
+}
+
 .toolbar {
   padding: 12px 14px;
   background: #ffffff;
   border-bottom: 1px solid #d8dee8;
   display: grid;
-  gap: 10px;
-}
-
-.path-grid {
-  display: grid;
-  grid-template-columns: minmax(260px, 1.4fr) repeat(2, minmax(180px, 1fr));
-  gap: 10px;
+  grid-template-columns: minmax(260px, 1fr) auto;
+  gap: 10px 16px;
+  align-items: center;
 }
 
 .source-summary,
@@ -356,7 +420,8 @@ button:disabled {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-  align-items: end;
+  align-items: center;
+  justify-content: flex-end;
 }
 
 .actions button {
@@ -388,20 +453,45 @@ button:disabled {
   font-size: 13px;
 }
 
+.project-settings {
+  grid-column: 1 / -1;
+  border-top: 1px solid #eef2f7;
+  padding-top: 8px;
+}
+
+.project-settings summary {
+  width: max-content;
+  color: #526173;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.project-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(220px, 1fr));
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.toolbar > .message {
+  grid-column: 1 / -1;
+}
+
 .workspace {
   display: grid;
-  grid-template-columns: minmax(270px, 320px) minmax(360px, 1fr) minmax(260px, 320px);
+  grid-template-columns: minmax(220px, 280px) minmax(220px, 280px) minmax(360px, 1fr) minmax(260px, 320px);
   min-height: 0;
 }
 
-.left-panel,
+.tree-panel,
 .right-panel {
   min-height: 0;
   overflow: auto;
   background: #f8fafc;
 }
 
-.left-panel {
+.tree-panel {
   border-right: 1px solid #d8dee8;
 }
 
@@ -658,15 +748,20 @@ h2 {
 }
 
 @media (max-width: 980px) {
-  .path-grid {
+  .toolbar,
+  .project-settings-grid {
     grid-template-columns: 1fr;
+  }
+
+  .actions {
+    justify-content: flex-start;
   }
 
   .workspace {
     grid-template-columns: 1fr;
   }
 
-  .left-panel,
+  .tree-panel,
   .right-panel {
     border: 0;
     border-bottom: 1px solid #d8dee8;

@@ -42,7 +42,8 @@ npm run dev
 
 1. Click `Open PSD/PSB` and choose a `.psd` or `.psb` file from the native file
    dialog. The source file remains read-only; raster previews are cached under
-   the system temp directory.
+   the system temp directory. The default `.psdui` and `ui.layout.json` paths
+   are derived automatically from the selected source file.
 2. In the Source Tree, select one layer or Cmd/Ctrl-select multiple source
    layers.
 3. Click `Create Export Node`. When multiple source layers are selected, they
@@ -54,6 +55,9 @@ npm run dev
    `padding`.
 6. Save the `.psdui` file.
 7. Export `ui.layout.json`.
+
+Manual path overrides live in `Project Settings`; the main toolbar keeps the
+default workflow focused on choosing a source file and editing export semantics.
 
 ## Current Boundaries
 
