@@ -33,9 +33,9 @@ describe('createExportNodeFromSources', () => {
         image: null,
         text: {
           value: 'Start',
-          fontFamily: 'Arial',
+          fontName: 'Arial',
           fontSize: 14,
-          color: '#ffffff'
+          color: { hex: '#ffffff' }
         }
       }
     ];

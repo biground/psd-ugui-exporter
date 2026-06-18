@@ -7,9 +7,13 @@ export interface Rect {
 
 export interface SourceText {
   value: string;
-  fontFamily: string;
-  fontSize: number;
-  color: string;
+  fontName?: string | null;
+  fontSize?: number | null;
+  color?: unknown;
+  tracking?: number | null;
+  alignment?: unknown;
+  runs?: unknown[];
+  stroke?: unknown;
 }
 
 export interface SourceImage {
@@ -24,7 +28,7 @@ export interface SourceLayer {
   kind: string;
   visible: boolean;
   opacity: number;
-  blendMode: string;
+  blendMode: string | null;
   sourceBounds: Rect;
   rasterBounds: Rect;
   image: SourceImage | null;
