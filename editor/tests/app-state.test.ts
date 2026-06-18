@@ -1,6 +1,11 @@
 import { describe, expect, test } from 'vitest';
 
-import { createEmptyState, createProjectFromSourceDocument, selectSourceLayer } from '../src/app/state';
+import {
+  createEmptyState,
+  createProjectFromSourceDocument,
+  selectSourceLayer,
+  toggleSourceLayerSelection
+} from '../src/app/state';
 import type { SourceLayer } from '../src/schemas/source';
 
 const baseLayer = {
@@ -20,6 +25,16 @@ describe('app state', () => {
     const state = selectSourceLayer(createEmptyState(), 12);
 
     expect(state.selectedSourceLayerIds).toEqual([12]);
+  });
+
+  test('toggles source layer selection for multi-select editing', () => {
+    const first = toggleSourceLayerSelection(createEmptyState(), 12);
+    const second = toggleSourceLayerSelection(first, 13);
+    const third = toggleSourceLayerSelection(second, 12);
+
+    expect(first.selectedSourceLayerIds).toEqual([12]);
+    expect(second.selectedSourceLayerIds).toEqual([12, 13]);
+    expect(third.selectedSourceLayerIds).toEqual([13]);
   });
 
   test('creates a project from a worker source document with default export nodes', () => {

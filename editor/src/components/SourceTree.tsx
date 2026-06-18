@@ -1,12 +1,23 @@
 import type { SourceLayer } from '../schemas/source';
 
+type MouseClickEvent = {
+  metaKey: boolean;
+  ctrlKey: boolean;
+};
+
 interface SourceTreeProps {
   layers: SourceLayer[];
   selectedLayerIds: number[];
   onSelectLayer: (layerId: number) => void;
+  onToggleLayerSelection: (layerId: number) => void;
 }
 
-export function SourceTree({ layers, selectedLayerIds, onSelectLayer }: SourceTreeProps) {
+export function SourceTree({
+  layers,
+  selectedLayerIds,
+  onSelectLayer,
+  onToggleLayerSelection
+}: SourceTreeProps) {
   if (layers.length === 0) {
     return <p className="empty-state">No source layers loaded.</p>;
   }
@@ -20,6 +31,7 @@ export function SourceTree({ layers, selectedLayerIds, onSelectLayer }: SourceTr
           depth={0}
           selectedLayerIds={selectedLayerIds}
           onSelectLayer={onSelectLayer}
+          onToggleLayerSelection={onToggleLayerSelection}
         />
       ))}
     </div>
@@ -31,8 +43,23 @@ interface SourceLayerRowProps extends Omit<SourceTreeProps, 'layers'> {
   depth: number;
 }
 
-function SourceLayerRow({ layer, depth, selectedLayerIds, onSelectLayer }: SourceLayerRowProps) {
+function SourceLayerRow({
+  layer,
+  depth,
+  selectedLayerIds,
+  onSelectLayer,
+  onToggleLayerSelection
+}: SourceLayerRowProps) {
   const isSelected = selectedLayerIds.includes(layer.id);
+
+  function selectLayer(event: MouseClickEvent) {
+    if (event.metaKey || event.ctrlKey) {
+      onToggleLayerSelection(layer.id);
+      return;
+    }
+
+    onSelectLayer(layer.id);
+  }
 
   return (
     <div role="treeitem" aria-selected={isSelected}>
@@ -40,7 +67,7 @@ function SourceLayerRow({ layer, depth, selectedLayerIds, onSelectLayer }: Sourc
         type="button"
         className={`tree-row ${isSelected ? 'selected' : ''}`}
         style={{ paddingLeft: `${12 + depth * 14}px` }}
-        onClick={() => onSelectLayer(layer.id)}
+        onClick={selectLayer}
       >
         <span className={`visibility-dot ${layer.visible ? 'visible' : 'hidden'}`} aria-hidden="true" />
         <span className="tree-name">{layer.name}</span>
@@ -53,6 +80,7 @@ function SourceLayerRow({ layer, depth, selectedLayerIds, onSelectLayer }: Sourc
           depth={depth + 1}
           selectedLayerIds={selectedLayerIds}
           onSelectLayer={onSelectLayer}
+          onToggleLayerSelection={onToggleLayerSelection}
         />
       ))}
     </div>

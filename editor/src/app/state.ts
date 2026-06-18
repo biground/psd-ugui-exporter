@@ -30,6 +30,17 @@ export function selectSourceLayer(state: AppState, layerId: number): AppState {
   };
 }
 
+export function toggleSourceLayerSelection(state: AppState, layerId: number): AppState {
+  const isSelected = state.selectedSourceLayerIds.includes(layerId);
+
+  return {
+    ...state,
+    selectedSourceLayerIds: isSelected
+      ? state.selectedSourceLayerIds.filter((selectedLayerId) => selectedLayerId !== layerId)
+      : [...state.selectedSourceLayerIds, layerId]
+  };
+}
+
 export function flattenSourceLayers(sourceTree: SourceLayer[]): SourceLayer[] {
   return sourceTree.flatMap((layer) => [layer, ...flattenSourceLayers(layer.children)]);
 }

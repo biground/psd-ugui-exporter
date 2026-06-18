@@ -15,6 +15,7 @@ import {
   findExportNodeById,
   findSourceLayersByIds,
   selectSourceLayer,
+  toggleSourceLayerSelection,
   type SourceDocumentInput,
   updateExportNode
 } from './state';
@@ -176,6 +177,9 @@ export function App() {
                 selectedLayerIds={state.selectedSourceLayerIds}
                 onSelectLayer={(layerId) =>
                   setState((current) => selectSourceLayer(current, layerId))
+                }
+                onToggleLayerSelection={(layerId) =>
+                  setState((current) => toggleSourceLayerSelection(current, layerId))
                 }
               />
             </section>
