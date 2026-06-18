@@ -1,0 +1,4 @@
+node_modules/
+.python/
+psdexport/
+*_export/

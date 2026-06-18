@@ -1,0 +1,21 @@
+{
+  "name": "psd-ugui-exporter",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "psd-ugui-export": "./src/cli.js"
+  },
+  "scripts": {
+    "preprocess": "node src/cli.js",
+    "setup:python": "python3 -m pip install --target .python -r requirements.txt",
+    "test": "node --test && PYTHONPATH=.python python3 -m unittest discover -s test -p '*_test.py'"
+  },
+  "dependencies": {
+    "@webtoon/psd": "^0.4.0",
+    "pngjs": "^7.0.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
