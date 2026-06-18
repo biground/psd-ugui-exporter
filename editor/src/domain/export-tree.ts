@@ -9,17 +9,19 @@ interface CreateExportNodeFromSourcesOptions {
   sourceLayers: SourceLayer[];
 }
 
-const DEFAULT_LIST_SETTINGS: ListSettings = {
-  direction: 'vertical',
-  cellTemplateNodeId: null,
-  spacing: 0,
-  padding: {
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0
-  }
-};
+function createDefaultListSettings(): ListSettings {
+  return {
+    direction: 'vertical',
+    cellTemplateNodeId: null,
+    spacing: 0,
+    padding: {
+      top: 0,
+      right: 0,
+      bottom: 0,
+      left: 0
+    }
+  };
+}
 
 export function createExportNodeFromSources({
   id,
@@ -38,7 +40,7 @@ export function createExportNodeFromSources({
     rect: unionRects(sourceLayers.map((layer) => layer.sourceBounds)),
     rasterBounds:
       imageLayers.length > 0 ? unionRects(imageLayers.map((layer) => layer.rasterBounds)) : null,
-    list: exportKind === 'list' ? { ...DEFAULT_LIST_SETTINGS } : null,
+    list: exportKind === 'list' ? createDefaultListSettings() : null,
     children: []
   };
 }
