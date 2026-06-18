@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { open } from '@tauri-apps/plugin-dialog';
 import { useMemo, useState } from 'react';
 
 import { CanvasPreview } from '../components/CanvasPreview';
@@ -25,8 +26,6 @@ type SelectChangeEvent = { target: HTMLSelectElement };
 
 export function App() {
   const [state, setState] = useState(createEmptyState);
-  const [sourcePath, setSourcePath] = useState('');
-  const [cacheDir, setCacheDir] = useState('');
   const [projectPath, setProjectPath] = useState('');
   const [layoutPath, setLayoutPath] = useState('');
   const [newExportKind, setNewExportKind] = useState<ExportKind>('image');
@@ -52,9 +51,29 @@ export function App() {
 
   async function openPsd() {
     await runCommand(async () => {
+      const selectedPath = await open({
+        title: 'Open PSD/PSB',
+        multiple: false,
+        filters: [
+          {
+            name: 'Photoshop documents',
+            extensions: ['psd', 'psb']
+          }
+        ]
+      });
+
+      if (selectedPath === null) {
+        setState((current) => ({
+          ...current,
+          message: 'Open cancelled.'
+        }));
+        return;
+      }
+
+      const sourcePath = Array.isArray(selectedPath) ? selectedPath[0] : selectedPath;
       const sourceDocument = await invoke<SourceDocumentInput>('open_psd', {
         sourcePath,
-        cacheDir
+        cacheDir: null
       });
       const project = createProjectFromSourceDocument(sourceDocument);
 
@@ -99,6 +118,9 @@ export function App() {
       if (state.project === null) {
         throw new Error('Open a PSD/PSB before saving.');
       }
+      if (projectPath.trim().length === 0) {
+        throw new Error('Enter a .psdui project path before saving.');
+      }
 
       await invoke('save_project', { projectPath, project: state.project });
       setState((current) => ({ ...current, message: `Saved ${projectPath}.` }));
@@ -109,6 +131,9 @@ export function App() {
     await runCommand(async () => {
       if (state.project === null) {
         throw new Error('Open a PSD/PSB before exporting layout.');
+      }
+      if (layoutPath.trim().length === 0) {
+        throw new Error('Enter a ui.layout.json path before exporting.');
       }
 
       const layout = createLayoutDocument(state.project);
@@ -135,8 +160,11 @@ export function App() {
       <main className="app-shell">
         <header className="toolbar">
           <div className="path-grid">
-            <PathInput label="PSD/PSB path" value={sourcePath} onChange={setSourcePath} />
-            <PathInput label="Cache dir" value={cacheDir} onChange={setCacheDir} />
+            <div className="source-summary">
+              <span>PSD/PSB source</span>
+              <strong>{state.project?.source.fileName ?? 'No file opened'}</strong>
+              <small>{state.project?.source.path ?? 'Click Open PSD/PSB to choose a file.'}</small>
+            </div>
             <PathInput label="Project path" value={projectPath} onChange={setProjectPath} />
             <PathInput label="Layout path" value={layoutPath} onChange={setLayoutPath} />
           </div>
@@ -273,10 +301,11 @@ button:disabled {
 
 .path-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(170px, 1fr));
+  grid-template-columns: minmax(260px, 1.4fr) repeat(2, minmax(180px, 1fr));
   gap: 10px;
 }
 
+.source-summary,
 .path-input,
 .field {
   display: grid;
@@ -284,6 +313,29 @@ button:disabled {
   color: #526173;
   font-size: 12px;
   font-weight: 650;
+}
+
+.source-summary {
+  min-width: 0;
+}
+
+.source-summary strong,
+.source-summary small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.source-summary strong {
+  min-height: 18px;
+  color: #17202c;
+  font-size: 13px;
+}
+
+.source-summary small {
+  color: #718096;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .path-input input,
@@ -450,32 +502,75 @@ h2 {
   display: grid;
   grid-template-rows: auto 1fr;
   gap: 12px;
+  overflow: hidden;
 }
 
 .canvas-info {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   gap: 16px;
   color: #526173;
   font-size: 13px;
+}
+
+.canvas-document-meta {
+  min-width: 0;
+  display: flex;
+  gap: 12px;
+  align-items: baseline;
 }
 
 .canvas-info strong {
   color: #1f2a37;
 }
 
+.canvas-document-meta strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.canvas-controls {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  align-items: center;
+}
+
+.canvas-controls button {
+  min-width: 34px;
+  padding: 0 8px;
+}
+
+.canvas-controls button[aria-pressed="true"] {
+  border-color: #2563eb;
+  background: #dcecff;
+  color: #1d4ed8;
+}
+
+.canvas-controls output {
+  min-width: 48px;
+  color: #334155;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
 .canvas-shell {
   min-height: 0;
-  display: grid;
-  place-items: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   overflow: auto;
+  border: 1px solid #d8dee8;
+  background: #e5eaf1;
 }
 
 .canvas-board {
   position: relative;
-  width: min(100%, 920px);
-  max-height: 100%;
+  flex: 0 0 auto;
   border: 1px solid #aeb8c7;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
   background:
     linear-gradient(45deg, #f8fafc 25%, transparent 25%),
     linear-gradient(-45deg, #f8fafc 25%, transparent 25%),
@@ -484,6 +579,14 @@ h2 {
   background-color: #ffffff;
   background-size: 24px 24px;
   background-position: 0 0, 0 12px, 12px -12px, -12px 0;
+}
+
+.canvas-layer-image {
+  position: absolute;
+  display: block;
+  object-fit: fill;
+  pointer-events: none;
+  user-select: none;
 }
 
 .canvas-node {
@@ -556,7 +659,7 @@ h2 {
 
 @media (max-width: 980px) {
   .path-grid {
-    grid-template-columns: repeat(2, minmax(170px, 1fr));
+    grid-template-columns: 1fr;
   }
 
   .workspace {

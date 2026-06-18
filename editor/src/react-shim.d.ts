@@ -13,8 +13,13 @@ declare namespace JSX {
 declare module 'react' {
   export type SetStateAction<T> = T | ((previous: T) => T);
   export type Dispatch<T> = (value: T) => void;
+  export interface RefObject<T> {
+    current: T | null;
+  }
 
+  export function useLayoutEffect(effect: () => void | (() => void), dependencies?: unknown[]): void;
   export function useMemo<T>(factory: () => T, dependencies: unknown[]): T;
+  export function useRef<T>(initialValue: T | null): RefObject<T>;
   export function useState<T>(initialState: T | (() => T)): [T, Dispatch<SetStateAction<T>>];
 
   const React: {

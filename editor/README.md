@@ -40,19 +40,20 @@ npm run dev
 
 ## MVP Flow
 
-1. Enter the PSD/PSB path and cache directory.
-2. Click `Open PSD/PSB`.
-3. In the Source Tree, select one layer or Cmd/Ctrl-select multiple source
+1. Click `Open PSD/PSB` and choose a `.psd` or `.psb` file from the native file
+   dialog. The source file remains read-only; raster previews are cached under
+   the system temp directory.
+2. In the Source Tree, select one layer or Cmd/Ctrl-select multiple source
    layers.
-4. Click `Create Export Node`. When multiple source layers are selected, they
+3. Click `Create Export Node`. When multiple source layers are selected, they
    are merged into one export node instead of creating one node per source
    layer.
-5. Use the Inspector to edit `name`, `enabled`, and `exportKind`.
-6. To manually mark a node as a list, set `exportKind` to `list` in the
+4. Use the Inspector to edit `name`, `enabled`, and `exportKind`.
+5. To manually mark a node as a list, set `exportKind` to `list` in the
    Inspector, then configure `direction`, `spacing`, `cellTemplateNodeId`, and
    `padding`.
-7. Save the `.psdui` file.
-8. Export `ui.layout.json`.
+6. Save the `.psdui` file.
+7. Export `ui.layout.json`.
 
 ## Current Boundaries
 

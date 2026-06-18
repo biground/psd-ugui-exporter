@@ -33,12 +33,21 @@ pub fn open_psd_with_worker(source_path: PathBuf, cache_dir: PathBuf) -> Result<
         ));
     }
 
-    serde_json::from_str(stdout.trim()).map_err(|error| {
+    let mut payload: Value = serde_json::from_str(stdout.trim()).map_err(|error| {
         format!(
             "Failed to parse PSD worker JSON output: {error}. stdout: {}",
             stdout.trim()
         )
-    })
+    })?;
+
+    if let Some(object) = payload.as_object_mut() {
+        object.insert(
+            "assetsDir".to_string(),
+            Value::String(cache_dir.to_string_lossy().into_owned()),
+        );
+    }
+
+    Ok(payload)
 }
 
 fn worker_script_path() -> PathBuf {
