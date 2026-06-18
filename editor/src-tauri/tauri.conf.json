@@ -17,5 +17,10 @@
         "height": 800
       }
     ]
+  },
+  "bundle": {
+    "resources": [
+      "python/psd_worker.py"
+    ]
   }
 }
