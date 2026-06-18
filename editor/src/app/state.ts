@@ -10,7 +10,9 @@ export interface AppState {
   message: string | null;
 }
 
-export type SourceDocumentInput = Omit<PSDUIProject, 'version' | 'exportTree'>;
+export type SourceDocumentInput = Omit<PSDUIProject, 'exportTree' | 'cache'> & {
+  assetsDir: string;
+};
 
 type ExportNodeUpdater = Partial<ExportNode> | ((node: ExportNode) => ExportNode);
 
@@ -70,7 +72,9 @@ export function createProjectFromSourceDocument(sourceDocument: SourceDocumentIn
     document: sourceDocument.document,
     sourceTree: sourceDocument.sourceTree,
     exportTree: createDefaultExportTree(sourceDocument.sourceTree),
-    cache: sourceDocument.cache
+    cache: {
+      assetsDir: sourceDocument.assetsDir
+    }
   };
 }
 

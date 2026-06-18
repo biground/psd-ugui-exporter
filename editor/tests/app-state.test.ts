@@ -39,6 +39,7 @@ describe('app state', () => {
 
   test('creates a project from a worker source document with default export nodes', () => {
     const sourceDocument = {
+      version: 1 as const,
       source: {
         path: '/tmp/menu.psb',
         fileName: 'menu.psb'
@@ -55,9 +56,7 @@ describe('app state', () => {
           image: { path: 'cache/logo.png', width: 10, height: 10 }
         }
       ],
-      cache: {
-        assetsDir: '/tmp/cache'
-      }
+      assetsDir: 'layers'
     };
 
     const project = createProjectFromSourceDocument(sourceDocument);
@@ -67,7 +66,9 @@ describe('app state', () => {
       source: sourceDocument.source,
       document: sourceDocument.document,
       sourceTree: sourceDocument.sourceTree,
-      cache: sourceDocument.cache,
+      cache: {
+        assetsDir: 'layers'
+      },
       exportTree: [
         {
           id: 'source_1',
@@ -77,5 +78,7 @@ describe('app state', () => {
         }
       ]
     });
+    expect(project.cache.assetsDir).toBe('layers');
+    expect(project.exportTree[0]?.sourceLayerIds).toEqual([sourceDocument.sourceTree[0].id]);
   });
 });
