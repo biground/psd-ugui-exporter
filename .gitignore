@@ -1,5 +1,6 @@
 node_modules/
 .python/
 .worktrees/
+editor/dist/
 psdexport/
 *_export/
