@@ -83,3 +83,12 @@ PNG exports are cropped to the alpha channel's non-transparent bounds.
 ```bash
 npm test
 ```
+
+## Desktop MVP
+
+The desktop MVP editor lives in [`editor/`](editor/README.md). It provides a
+Tauri/React vertical slice for opening a PSD/PSB source tree, creating export
+nodes, saving `.psdui`, and exporting `ui.layout.json`.
+
+The existing CLI preprocessing flow above remains available and can continue to
+be used independently of the desktop editor.
