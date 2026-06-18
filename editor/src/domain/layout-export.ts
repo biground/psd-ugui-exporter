@@ -1,33 +1,7 @@
-import type { ExportKind, ListSettings, PSDUIProject } from '../schemas/psdui';
-import type { Rect } from '../schemas/source';
+import type { UILayoutDocument, UILayoutNode } from '../schemas/layout';
+import type { ExportNode, PSDUIProject } from '../schemas/psdui';
 
-interface LayoutDocumentSize {
-  width: number;
-  height: number;
-}
-
-type ProjectWithDocument = PSDUIProject & {
-  document: LayoutDocumentSize;
-};
-
-export interface UILayoutNode {
-  id: string;
-  name: string;
-  exportKind: ExportKind;
-  rect: Rect;
-  rasterBounds: Rect | null;
-  sourceLayerIds: number[];
-  list: ListSettings | null;
-  children: UILayoutNode[];
-}
-
-export interface UILayoutDocument {
-  version: 1;
-  document: LayoutDocumentSize;
-  nodes: UILayoutNode[];
-}
-
-function createLayoutNode(node: ProjectWithDocument['root']): UILayoutNode | null {
+function createLayoutNode(node: ExportNode): UILayoutNode | null {
   if (!node.enabled) {
     return null;
   }
@@ -48,12 +22,10 @@ function createLayoutNode(node: ProjectWithDocument['root']): UILayoutNode | nul
 }
 
 export function createLayoutDocument(project: PSDUIProject): UILayoutDocument {
-  const projectWithDocument = project as ProjectWithDocument;
-
   return {
     version: 1,
-    document: projectWithDocument.document,
-    nodes: projectWithDocument.root.children.flatMap((child) => {
+    document: project.document,
+    nodes: project.exportTree.flatMap((child) => {
       const layoutNode = createLayoutNode(child);
       return layoutNode === null ? [] : [layoutNode];
     })

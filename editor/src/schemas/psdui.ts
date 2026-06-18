@@ -1,4 +1,4 @@
-import type { Rect } from './source';
+import type { Rect, SourceLayer } from './source';
 
 export type ExportKind = 'group' | 'image' | 'text' | 'button' | 'list';
 
@@ -27,8 +27,18 @@ export interface ExportNode {
 }
 
 export interface PSDUIProject {
-  id: string;
-  name: string;
-  sourcePath: string;
-  root: ExportNode;
+  version: 1;
+  source: {
+    path: string;
+    fileName: string;
+  };
+  document: {
+    width: number;
+    height: number;
+  };
+  sourceTree: SourceLayer[];
+  exportTree: ExportNode[];
+  cache: {
+    assetsDir: string;
+  };
 }
