@@ -15,6 +15,7 @@ import {
   collectVisiblePreviewTextLayers,
   resolveLayerImagePath
 } from '../domain/preview-assets';
+import { createPreviewFontFamily } from '../domain/preview-text-style';
 import type { PSDUIProject } from '../schemas/psdui';
 import type { SourceText } from '../schemas/source';
 
@@ -344,11 +345,7 @@ function resolveTextColor(text: SourceText | null): string {
 }
 
 function resolveTextFontFamily(text: SourceText | null): string {
-  if (typeof text?.fontName === 'string' && text.fontName.trim().length > 0) {
-    return `${JSON.stringify(text.fontName)}, Inter, ui-sans-serif, system-ui, sans-serif`;
-  }
-
-  return 'Inter, ui-sans-serif, system-ui, sans-serif';
+  return createPreviewFontFamily(text?.fontName);
 }
 
 function resolveTextAlign(text: SourceText | null): 'left' | 'right' | 'center' | 'justify' {
