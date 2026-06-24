@@ -14,7 +14,8 @@
       {
         "title": "PSD UGUI Editor",
         "width": 1200,
-        "height": 800
+        "height": 800,
+        "acceptFirstMouse": true
       }
     ],
     "security": {

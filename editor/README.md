@@ -41,9 +41,10 @@ npm run dev
 ## MVP Flow
 
 1. Click `Open PSD/PSB` and choose a `.psd` or `.psb` file from the native file
-   dialog. The source file remains read-only; raster previews are cached under
-   the system temp directory. The default `.psdui` and `ui.layout.json` paths
-   are derived automatically from the selected source file.
+   dialog, which opens at `~/Documents` by default. The source file remains
+   read-only; raster previews are cached under the system temp directory. The
+   default `.psdui` and `ui.layout.json` paths are derived automatically from
+   the selected source file.
 2. In the Source Tree, select one layer or Cmd/Ctrl-select multiple source
    layers.
 3. Click `Create Export Node`. When multiple source layers are selected, they

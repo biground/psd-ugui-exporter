@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { documentDir } from '@tauri-apps/api/path';
 import { open } from '@tauri-apps/plugin-dialog';
 import { useMemo, useState } from 'react';
 
@@ -8,6 +9,7 @@ import { Inspector } from '../components/Inspector';
 import { SourceTree } from '../components/SourceTree';
 import { createLayoutDocument } from '../domain/layout-export';
 import type { ExportKind, ExportNode } from '../schemas/psdui';
+import { createOpenPsdDialogOptions } from './open-dialog';
 import { deriveDefaultProjectSettings, type ProjectSettings } from './project-settings';
 import {
   appendExportNode,
@@ -56,16 +58,7 @@ export function App() {
 
   async function openPsd() {
     await runCommand(async () => {
-      const selectedPath = await open({
-        title: 'Open PSD/PSB',
-        multiple: false,
-        filters: [
-          {
-            name: 'Photoshop documents',
-            extensions: ['psd', 'psb']
-          }
-        ]
-      });
+      const selectedPath = await open(createOpenPsdDialogOptions(await documentDir()));
 
       if (selectedPath === null) {
         setState((current) => ({
