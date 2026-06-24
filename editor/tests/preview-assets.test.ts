@@ -33,6 +33,23 @@ describe('preview assets', () => {
     expect(collectVisiblePreviewImageLayers(layers).map(({ layer }) => layer.name)).toEqual(['Visible']);
   });
 
+  test('skips preview-hidden subtrees without changing source visibility', () => {
+    const layers: SourceLayer[] = [
+      {
+        ...baseLayer,
+        id: 1,
+        name: 'Button',
+        kind: 'group',
+        image: null,
+        children: [{ ...baseLayer, id: 2, name: 'Button BG' }]
+      }
+    ];
+
+    expect(collectVisiblePreviewImageLayers(layers, [1, 2]).map(({ layer }) => layer.name)).toEqual([]);
+    expect(layers[0].visible).toBe(true);
+    expect(layers[0].children[0]?.visible).toBe(true);
+  });
+
   test('resolves relative layer image paths under the cache root', () => {
     const layer: SourceLayer = { ...baseLayer, id: 1, name: 'Icon' };
 

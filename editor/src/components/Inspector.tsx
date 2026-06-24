@@ -2,7 +2,10 @@ import type { ExportKind, ExportNode, ListSettings } from '../schemas/psdui';
 
 interface InspectorProps {
   node: ExportNode | null;
+  selectedSourceLayerCount: number;
   onUpdateNode: (patch: Partial<ExportNode> | ((node: ExportNode) => ExportNode)) => void;
+  onMergeSelectedSources: () => void;
+  onUnmergeNode: (nodeId: string) => void;
 }
 
 const exportKinds: ExportKind[] = ['group', 'image', 'text', 'button', 'list'];
@@ -10,11 +13,21 @@ const exportKinds: ExportKind[] = ['group', 'image', 'text', 'button', 'list'];
 type InputChangeEvent = { target: HTMLInputElement };
 type SelectChangeEvent = { target: HTMLSelectElement };
 
-export function Inspector({ node, onUpdateNode }: InspectorProps) {
+export function Inspector({
+  node,
+  selectedSourceLayerCount,
+  onUpdateNode,
+  onMergeSelectedSources,
+  onUnmergeNode
+}: InspectorProps) {
   if (node === null) {
     return (
       <section className="inspector-empty">
         <h2>Inspector</h2>
+        <SourceSelectionActions
+          selectedSourceLayerCount={selectedSourceLayerCount}
+          onMergeSelectedSources={onMergeSelectedSources}
+        />
         <p>Select an export node to edit its export semantics.</p>
       </section>
     );
@@ -23,6 +36,10 @@ export function Inspector({ node, onUpdateNode }: InspectorProps) {
   return (
     <section className="inspector">
       <h2>Inspector</h2>
+      <SourceSelectionActions
+        selectedSourceLayerCount={selectedSourceLayerCount}
+        onMergeSelectedSources={onMergeSelectedSources}
+      />
       <label className="field">
         <span>Name</span>
         <input
@@ -55,9 +72,44 @@ export function Inspector({ node, onUpdateNode }: InspectorProps) {
         <span>Source layer ids</span>
         <output>{node.sourceLayerIds.join(', ') || 'None'}</output>
       </div>
+      {node.sourceLayerIds.length > 1 ? (
+        <button type="button" className="danger-button" onClick={() => onUnmergeNode(node.id)}>
+          Unmerge Node
+        </button>
+      ) : null}
       {node.exportKind === 'list' && node.list !== null ? (
         <ListSettingsEditor list={node.list} onUpdateNode={onUpdateNode} />
       ) : null}
+    </section>
+  );
+}
+
+interface SourceSelectionActionsProps {
+  selectedSourceLayerCount: number;
+  onMergeSelectedSources: () => void;
+}
+
+function SourceSelectionActions({
+  selectedSourceLayerCount,
+  onMergeSelectedSources
+}: SourceSelectionActionsProps) {
+  if (selectedSourceLayerCount === 0) {
+    return null;
+  }
+
+  return (
+    <section className="source-selection-actions" aria-label="Source selection actions">
+      <div>
+        <strong>Source selection</strong>
+        <span>{selectedSourceLayerCount} layer{selectedSourceLayerCount === 1 ? '' : 's'}</span>
+      </div>
+      <button
+        type="button"
+        onClick={onMergeSelectedSources}
+        disabled={selectedSourceLayerCount < 2}
+      >
+        Merge Selected Layers
+      </button>
     </section>
   );
 }

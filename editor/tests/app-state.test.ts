@@ -1,9 +1,13 @@
 import { describe, expect, test } from 'vitest';
 
 import {
+  appendExportNode,
   createEmptyState,
+  createExportNodeForSources,
   createProjectFromSourceDocument,
+  removeExportNode,
   selectSourceLayer,
+  toggleSourceLayerPreviewVisibility,
   toggleSourceLayerSelection
 } from '../src/app/state';
 import type { SourceLayer } from '../src/schemas/source';
@@ -35,6 +39,92 @@ describe('app state', () => {
     expect(first.selectedSourceLayerIds).toEqual([12]);
     expect(second.selectedSourceLayerIds).toEqual([12, 13]);
     expect(third.selectedSourceLayerIds).toEqual([13]);
+  });
+
+  test('toggles source layer preview visibility recursively without changing source metadata', () => {
+    const state = {
+      ...createEmptyState(),
+      project: createProjectFromSourceDocument({
+        version: 1 as const,
+        source: {
+          path: '/tmp/menu.psb',
+          fileName: 'menu.psb'
+        },
+        document: {
+          width: 320,
+          height: 180
+        },
+        sourceTree: [
+          {
+            ...baseLayer,
+            id: 1,
+            name: 'Button',
+            children: [
+              {
+                ...baseLayer,
+                id: 2,
+                name: 'Button Glow'
+              }
+            ]
+          }
+        ],
+        assetsDir: 'layers'
+      })
+    };
+
+    const hidden = toggleSourceLayerPreviewVisibility(state, 1);
+
+    expect(hidden.hiddenSourceLayerIds).toEqual([1, 2]);
+    expect(hidden.project?.sourceTree[0]?.visible).toBe(true);
+    expect(hidden.project?.sourceTree[0]?.children[0]?.visible).toBe(true);
+    expect(state.project?.sourceTree[0]?.visible).toBe(true);
+
+    const shown = toggleSourceLayerPreviewVisibility(hidden, 1);
+
+    expect(shown.hiddenSourceLayerIds).toEqual([]);
+  });
+
+  test('creates and removes a merged export node from selected source layers', () => {
+    const sourceLayers = [
+      {
+        ...baseLayer,
+        id: 1,
+        name: 'Button BG',
+        image: { path: 'cache/bg.png', width: 10, height: 10 }
+      },
+      {
+        ...baseLayer,
+        id: 2,
+        name: 'Button Label'
+      }
+    ];
+    const state = {
+      ...createEmptyState(),
+      project: createProjectFromSourceDocument({
+        version: 1 as const,
+        source: {
+          path: '/tmp/menu.psb',
+          fileName: 'menu.psb'
+        },
+        document: {
+          width: 320,
+          height: 180
+        },
+        sourceTree: sourceLayers,
+        assetsDir: 'layers'
+      })
+    };
+
+    const mergedNode = createExportNodeForSources('merged_button', sourceLayers, 'button');
+    const appended = appendExportNode(state, mergedNode);
+
+    expect(appended.selectedExportNodeId).toBe('merged_button');
+    expect(appended.project?.exportTree.at(-1)?.sourceLayerIds).toEqual([1, 2]);
+
+    const removed = removeExportNode(appended, 'merged_button');
+
+    expect(removed.selectedExportNodeId).toBeNull();
+    expect(removed.project?.exportTree.some((node) => node.id === 'merged_button')).toBe(false);
   });
 
   test('creates a project from a worker source document with default export nodes', () => {

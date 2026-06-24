@@ -18,7 +18,9 @@ import {
   createProjectFromSourceDocument,
   findExportNodeById,
   findSourceLayersByIds,
+  removeExportNode,
   selectSourceLayer,
+  toggleSourceLayerPreviewVisibility,
   toggleSourceLayerSelection,
   type SourceDocumentInput,
   updateExportNode
@@ -84,6 +86,7 @@ export function App() {
       setState({
         project,
         selectedSourceLayerIds: [],
+        hiddenSourceLayerIds: [],
         selectedExportNodeId: project.exportTree[0]?.id ?? null,
         message: `Opened ${project.source.fileName}.`
       });
@@ -154,6 +157,10 @@ export function App() {
     }
 
     setState((current) => updateExportNode(current, nodeId, patch));
+  }
+
+  function unmergeSelectedExportNode(nodeId: string) {
+    setState((current) => removeExportNode(current, nodeId));
   }
 
   const canCreateNode = state.project !== null && state.selectedSourceLayerIds.length > 0;
@@ -235,11 +242,15 @@ export function App() {
                   <SourceTree
                     layers={project.sourceTree}
                     selectedLayerIds={state.selectedSourceLayerIds}
+                    hiddenLayerIds={state.hiddenSourceLayerIds}
                     onSelectLayer={(layerId) =>
                       setState((current) => selectSourceLayer(current, layerId))
                     }
                     onToggleLayerSelection={(layerId) =>
                       setState((current) => toggleSourceLayerSelection(current, layerId))
+                    }
+                    onToggleLayerVisibility={(layerId) =>
+                      setState((current) => toggleSourceLayerPreviewVisibility(current, layerId))
                     }
                   />
                 </section>
@@ -259,9 +270,16 @@ export function App() {
               <CanvasPreview
                 project={project}
                 selectedExportNodeId={state.selectedExportNodeId}
+                hiddenSourceLayerIds={state.hiddenSourceLayerIds}
               />
               <aside className="right-panel">
-                <Inspector node={selectedExportNode} onUpdateNode={updateSelectedExportNode} />
+                <Inspector
+                  node={selectedExportNode}
+                  selectedSourceLayerCount={state.selectedSourceLayerIds.length}
+                  onUpdateNode={updateSelectedExportNode}
+                  onMergeSelectedSources={createExportNode}
+                  onUnmergeNode={unmergeSelectedExportNode}
+                />
               </aside>
             </section>
           </>
@@ -558,6 +576,96 @@ h2 {
   padding-bottom: 6px;
 }
 
+.source-tree-row {
+  grid-template-columns: 26px 18px minmax(0, 1fr);
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+
+.source-tree-row .tree-row-main {
+  min-width: 0;
+}
+
+.tree-row-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  min-height: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+}
+
+.tree-row-main:hover {
+  background: transparent;
+}
+
+.icon-button {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  min-width: 24px;
+  min-height: 24px;
+  height: 24px;
+  border-color: transparent;
+  background: transparent;
+  padding: 0;
+}
+
+.icon-button:hover {
+  border-color: #c4ccd8;
+  background: #ffffff;
+}
+
+.eye-icon {
+  position: relative;
+  width: 15px;
+  height: 9px;
+  border: 1.5px solid #526173;
+  border-radius: 999px / 70%;
+}
+
+.eye-icon::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: #526173;
+  transform: translate(-50%, -50%);
+}
+
+.layer-visibility-toggle.is-hidden .eye-icon {
+  border-color: #a8b0bd;
+}
+
+.layer-visibility-toggle.is-hidden .eye-icon::before {
+  background: #a8b0bd;
+}
+
+.layer-visibility-toggle.is-hidden .eye-icon::after {
+  content: "";
+  position: absolute;
+  left: -2px;
+  top: 3px;
+  width: 19px;
+  height: 1.5px;
+  border-radius: 999px;
+  background: #a8b0bd;
+  transform: rotate(-32deg);
+}
+
+.layer-selection-checkbox {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+}
+
 .tree-row:hover {
   background: #eef4fb;
 }
@@ -733,11 +841,41 @@ h2 {
   gap: 12px;
 }
 
+.inspector-empty {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+}
+
 .right-panel > .inspector,
 .right-panel > .inspector-empty {
   height: 100%;
   min-height: 0;
   overflow: auto;
+}
+
+.source-selection-actions {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #d8dee8;
+  border-radius: 6px;
+  background: #ffffff;
+}
+
+.source-selection-actions div {
+  display: grid;
+  gap: 2px;
+}
+
+.source-selection-actions strong {
+  color: #253244;
+  font-size: 13px;
+}
+
+.source-selection-actions span {
+  color: #64748b;
+  font-size: 12px;
 }
 
 .checkbox-field {
@@ -752,6 +890,12 @@ h2 {
 .checkbox-field input {
   width: 16px;
   height: 16px;
+}
+
+.danger-button {
+  border-color: #f3b2b2;
+  background: #fff7f7;
+  color: #b42318;
 }
 
 .list-settings {

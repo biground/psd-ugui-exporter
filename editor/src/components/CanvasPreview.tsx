@@ -15,9 +15,14 @@ import type { PSDUIProject } from '../schemas/psdui';
 interface CanvasPreviewProps {
   project: PSDUIProject | null;
   selectedExportNodeId: string | null;
+  hiddenSourceLayerIds: number[];
 }
 
-export function CanvasPreview({ project, selectedExportNodeId }: CanvasPreviewProps) {
+export function CanvasPreview({
+  project,
+  selectedExportNodeId,
+  hiddenSourceLayerIds
+}: CanvasPreviewProps) {
   const shellRef = useRef<HTMLDivElement | null>(null);
   const [fitZoom, setFitZoom] = useState(1);
   const [manualZoom, setManualZoom] = useState(1);
@@ -73,7 +78,13 @@ export function CanvasPreview({ project, selectedExportNodeId }: CanvasPreviewPr
   const documentWidth = Math.max(1, project.document.width);
   const documentHeight = Math.max(1, project.document.height);
   const nodes = flattenExportNodes(project.exportTree);
-  const imageLayers = collectVisiblePreviewImageLayers(project.sourceTree);
+  const hiddenLayerIds = new Set(hiddenSourceLayerIds);
+  const visibleNodes = nodes.filter(
+    (node) =>
+      node.sourceLayerIds.length === 0
+      || node.sourceLayerIds.some((sourceLayerId) => !hiddenLayerIds.has(sourceLayerId))
+  );
+  const imageLayers = collectVisiblePreviewImageLayers(project.sourceTree, hiddenSourceLayerIds);
   const zoomLabel = `${Math.round(effectiveZoom * 100)}%`;
 
   return (
@@ -205,7 +216,7 @@ export function CanvasPreview({ project, selectedExportNodeId }: CanvasPreviewPr
               />
             );
           })}
-          {nodes.map((node) => {
+          {visibleNodes.map((node) => {
             const isSelected = selectedExportNodeId === node.id;
 
             return (

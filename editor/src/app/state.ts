@@ -6,6 +6,7 @@ import type { SourceLayer } from '../schemas/source';
 export interface AppState {
   project: PSDUIProject | null;
   selectedSourceLayerIds: number[];
+  hiddenSourceLayerIds: number[];
   selectedExportNodeId: string | null;
   message: string | null;
 }
@@ -20,6 +21,7 @@ export function createEmptyState(): AppState {
   return {
     project: null,
     selectedSourceLayerIds: [],
+    hiddenSourceLayerIds: [],
     selectedExportNodeId: null,
     message: null
   };
@@ -40,6 +42,29 @@ export function toggleSourceLayerSelection(state: AppState, layerId: number): Ap
     selectedSourceLayerIds: isSelected
       ? state.selectedSourceLayerIds.filter((selectedLayerId) => selectedLayerId !== layerId)
       : [...state.selectedSourceLayerIds, layerId]
+  };
+}
+
+export function toggleSourceLayerPreviewVisibility(state: AppState, layerId: number): AppState {
+  if (state.project === null) {
+    return state;
+  }
+
+  const layerIds = collectSourceLayerAndDescendantIds(state.project.sourceTree, layerId);
+  const hiddenIds = new Set(state.hiddenSourceLayerIds);
+  const shouldShow = hiddenIds.has(layerId);
+
+  for (const id of layerIds) {
+    if (shouldShow) {
+      hiddenIds.delete(id);
+    } else {
+      hiddenIds.add(id);
+    }
+  }
+
+  return {
+    ...state,
+    hiddenSourceLayerIds: [...hiddenIds]
   };
 }
 
@@ -126,6 +151,37 @@ export function updateExportNode(state: AppState, nodeId: string, updater: Expor
   };
 }
 
+export function removeExportNode(state: AppState, nodeId: string): AppState {
+  if (state.project === null) {
+    return state;
+  }
+
+  return {
+    ...state,
+    project: {
+      ...state.project,
+      exportTree: removeExportNodeFromTree(state.project.exportTree, nodeId)
+    },
+    selectedExportNodeId: state.selectedExportNodeId === nodeId ? null : state.selectedExportNodeId,
+    message: `Unmerged export node "${nodeId}".`
+  };
+}
+
+function collectSourceLayerAndDescendantIds(sourceTree: SourceLayer[], layerId: number): number[] {
+  for (const layer of sourceTree) {
+    if (layer.id === layerId) {
+      return flattenSourceLayers([layer]).map((sourceLayer) => sourceLayer.id);
+    }
+
+    const childIds = collectSourceLayerAndDescendantIds(layer.children, layerId);
+    if (childIds.length > 0) {
+      return childIds;
+    }
+  }
+
+  return [];
+}
+
 function updateExportTree(
   exportTree: ExportNode[],
   nodeId: string,
@@ -142,6 +198,15 @@ function updateExportTree(
       children: updateExportTree(node.children, nodeId, updater)
     };
   });
+}
+
+function removeExportNodeFromTree(exportTree: ExportNode[], nodeId: string): ExportNode[] {
+  return exportTree
+    .filter((node) => node.id !== nodeId)
+    .map((node) => ({
+      ...node,
+      children: removeExportNodeFromTree(node.children, nodeId)
+    }));
 }
 
 function normalizeExportNode(node: ExportNode): ExportNode {
