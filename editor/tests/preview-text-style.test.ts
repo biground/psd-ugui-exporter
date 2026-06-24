@@ -13,6 +13,9 @@ describe('preview text style', () => {
     expect(createPreviewFontFamily('MicrosoftYaHei')).toBe(
       '"MicrosoftYaHei", "Microsoft YaHei", Inter, ui-sans-serif, system-ui, sans-serif'
     );
+    expect(createPreviewFontFamily('SourceHanSansCN-Heavy')).toBe(
+      '"SourceHanSansCN-Heavy", "Source Han Sans CN Heavy", Inter, ui-sans-serif, system-ui, sans-serif'
+    );
   });
 
   test('falls back to the editor font stack when PSD font name is missing', () => {

@@ -46,6 +46,10 @@ function resolveKnownFontFamily(compactName: string): string | null {
     return 'Noto Sans CJK SC';
   }
 
+  if (/^SourceHanSansCN[-_]Heavy$/i.test(compactName)) {
+    return 'Source Han Sans CN Heavy';
+  }
+
   if (/^SourceHanSansCN(?:[-_].+)?$/i.test(compactName)) {
     return 'Source Han Sans CN';
   }
