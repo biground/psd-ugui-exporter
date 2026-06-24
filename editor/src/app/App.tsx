@@ -12,12 +12,15 @@ import type { ExportKind, ExportNode } from '../schemas/psdui';
 import { createOpenPsdDialogOptions } from './open-dialog';
 import { deriveDefaultProjectSettings, type ProjectSettings } from './project-settings';
 import {
+  addSourceLayerToExportTree,
   appendExportNode,
+  collectExportedSourceLayerIds,
   createEmptyState,
   createExportNodeForSources,
   createProjectFromSourceDocument,
   findExportNodeById,
   findSourceLayersByIds,
+  moveExportNode,
   removeExportNode,
   selectSourceLayer,
   toggleSourceLayerPreviewVisibility,
@@ -46,6 +49,14 @@ export function App() {
 
     return findExportNodeById(state.project.exportTree, state.selectedExportNodeId);
   }, [state.project, state.selectedExportNodeId]);
+
+  const exportedSourceLayerIds = useMemo(() => {
+    if (state.project === null) {
+      return [];
+    }
+
+    return collectExportedSourceLayerIds(state.project.exportTree);
+  }, [state.project]);
 
   async function runCommand(action: () => Promise<void>) {
     try {
@@ -163,6 +174,18 @@ export function App() {
     setState((current) => removeExportNode(current, nodeId));
   }
 
+  function addSourceLayerExportNode(layerId: number) {
+    setState((current) => addSourceLayerToExportTree(current, layerId));
+  }
+
+  function deleteExportNode(nodeId: string) {
+    setState((current) => removeExportNode(current, nodeId));
+  }
+
+  function moveSelectedExportNode(nodeId: string, direction: 'up' | 'down') {
+    setState((current) => moveExportNode(current, nodeId, direction));
+  }
+
   const canCreateNode = state.project !== null && state.selectedSourceLayerIds.length > 0;
   const project = state.project;
   const hasProject = project !== null;
@@ -243,9 +266,11 @@ export function App() {
                     layers={project.sourceTree}
                     selectedLayerIds={state.selectedSourceLayerIds}
                     hiddenLayerIds={state.hiddenSourceLayerIds}
+                    exportedSourceLayerIds={exportedSourceLayerIds}
                     onSelectLayer={(layerId) =>
                       setState((current) => selectSourceLayer(current, layerId))
                     }
+                    onAddLayerToExportTree={addSourceLayerExportNode}
                     onToggleLayerSelection={(layerId) =>
                       setState((current) => toggleSourceLayerSelection(current, layerId))
                     }
@@ -261,6 +286,8 @@ export function App() {
                   <ExportTree
                     nodes={project.exportTree}
                     selectedNodeId={state.selectedExportNodeId}
+                    onDeleteNode={deleteExportNode}
+                    onMoveNode={moveSelectedExportNode}
                     onSelectNode={(nodeId) =>
                       setState((current) => ({ ...current, selectedExportNodeId: nodeId }))
                     }
@@ -577,8 +604,14 @@ h2 {
 }
 
 .source-tree-row {
-  grid-template-columns: 26px 18px minmax(0, 1fr);
+  grid-template-columns: 26px 18px minmax(0, 1fr) 26px;
   gap: 6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+}
+
+.export-tree-row {
+  grid-template-columns: auto minmax(0, 1fr) auto;
   border: 1px solid transparent;
   border-radius: 6px;
 }
@@ -664,6 +697,35 @@ h2 {
   width: 16px;
   height: 16px;
   margin: 0;
+}
+
+.add-export-button {
+  color: #1d4ed8;
+  font-weight: 800;
+}
+
+.tree-row-actions {
+  display: flex;
+  gap: 2px;
+  align-items: center;
+}
+
+.tree-row-actions .icon-button {
+  width: 22px;
+  min-width: 22px;
+  height: 22px;
+  min-height: 22px;
+  color: #526173;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.tree-row-actions .icon-button:disabled {
+  opacity: 0.28;
+}
+
+.danger-icon-button {
+  color: #b42318;
 }
 
 .tree-row:hover {

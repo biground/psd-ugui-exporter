@@ -1,10 +1,12 @@
 import { describe, expect, test } from 'vitest';
 
 import {
+  addSourceLayerToExportTree,
   appendExportNode,
   createEmptyState,
   createExportNodeForSources,
   createProjectFromSourceDocument,
+  moveExportNode,
   removeExportNode,
   selectSourceLayer,
   toggleSourceLayerPreviewVisibility,
@@ -84,6 +86,84 @@ describe('app state', () => {
     expect(shown.hiddenSourceLayerIds).toEqual([]);
   });
 
+  test('creates a project from a worker source document with an empty export tree', () => {
+    const sourceDocument = {
+      version: 1 as const,
+      source: {
+        path: '/tmp/menu.psb',
+        fileName: 'menu.psb'
+      },
+      document: {
+        width: 320,
+        height: 180
+      },
+      sourceTree: [
+        {
+          ...baseLayer,
+          id: 1,
+          name: 'Logo',
+          image: { path: 'cache/logo.png', width: 10, height: 10 }
+        }
+      ],
+      assetsDir: 'layers'
+    };
+
+    const project = createProjectFromSourceDocument(sourceDocument);
+
+    expect(project).toMatchObject({
+      version: 1,
+      source: sourceDocument.source,
+      document: sourceDocument.document,
+      sourceTree: sourceDocument.sourceTree,
+      cache: {
+        assetsDir: 'layers'
+      },
+      exportTree: []
+    });
+  });
+
+  test('adds a source layer to the export tree once', () => {
+    const sourceDocument = {
+      version: 1 as const,
+      source: {
+        path: '/tmp/menu.psb',
+        fileName: 'menu.psb'
+      },
+      document: {
+        width: 320,
+        height: 180
+      },
+      sourceTree: [
+        {
+          ...baseLayer,
+          id: 1,
+          name: 'Logo',
+          image: { path: 'cache/logo.png', width: 10, height: 10 }
+        }
+      ],
+      assetsDir: 'layers'
+    };
+    const state = {
+      ...createEmptyState(),
+      project: createProjectFromSourceDocument(sourceDocument)
+    };
+
+    const added = addSourceLayerToExportTree(state, 1);
+    const duplicate = addSourceLayerToExportTree(added, 1);
+
+    expect(added.project?.exportTree).toMatchObject([
+      {
+        id: 'source_1',
+        name: 'Logo',
+        exportKind: 'image',
+        sourceLayerIds: [1]
+      }
+    ]);
+    expect(added.selectedExportNodeId).toBe('source_1');
+    expect(duplicate.project?.exportTree).toHaveLength(1);
+    expect(duplicate.message).toBe('Source layer "Logo" is already in the export tree.');
+  });
+
   test('creates and removes a merged export node from selected source layers', () => {
     const sourceLayers = [
       {
@@ -119,7 +199,7 @@ describe('app state', () => {
     const appended = appendExportNode(state, mergedNode);
 
     expect(appended.selectedExportNodeId).toBe('merged_button');
-    expect(appended.project?.exportTree.at(-1)?.sourceLayerIds).toEqual([1, 2]);
+    expect(appended.project?.exportTree[0]?.sourceLayerIds).toEqual([1, 2]);
 
     const removed = removeExportNode(appended, 'merged_button');
 
@@ -127,8 +207,10 @@ describe('app state', () => {
     expect(removed.project?.exportTree.some((node) => node.id === 'merged_button')).toBe(false);
   });
 
-  test('creates a project from a worker source document with default export nodes', () => {
-    const sourceDocument = {
+  test('moves export nodes among siblings', () => {
+    const state = {
+      ...createEmptyState(),
+      project: createProjectFromSourceDocument({
       version: 1 as const,
       source: {
         path: '/tmp/menu.psb',
@@ -144,31 +226,24 @@ describe('app state', () => {
           id: 1,
           name: 'Logo',
           image: { path: 'cache/logo.png', width: 10, height: 10 }
+        },
+        {
+          ...baseLayer,
+          id: 2,
+          name: 'Title',
+          text: { value: 'Title' }
         }
       ],
       assetsDir: 'layers'
+      })
     };
 
-    const project = createProjectFromSourceDocument(sourceDocument);
+    const added = addSourceLayerToExportTree(addSourceLayerToExportTree(state, 1), 2);
+    const movedUp = moveExportNode(added, 'source_2', 'up');
+    const movedDown = moveExportNode(movedUp, 'source_2', 'down');
 
-    expect(project).toMatchObject({
-      version: 1,
-      source: sourceDocument.source,
-      document: sourceDocument.document,
-      sourceTree: sourceDocument.sourceTree,
-      cache: {
-        assetsDir: 'layers'
-      },
-      exportTree: [
-        {
-          id: 'source_1',
-          name: 'Logo',
-          exportKind: 'image',
-          sourceLayerIds: [1]
-        }
-      ]
-    });
-    expect(project.cache.assetsDir).toBe('layers');
-    expect(project.exportTree[0]?.sourceLayerIds).toEqual([sourceDocument.sourceTree[0].id]);
+    expect(added.project?.exportTree.map((node) => node.id)).toEqual(['source_1', 'source_2']);
+    expect(movedUp.project?.exportTree.map((node) => node.id)).toEqual(['source_2', 'source_1']);
+    expect(movedDown.project?.exportTree.map((node) => node.id)).toEqual(['source_1', 'source_2']);
   });
 });

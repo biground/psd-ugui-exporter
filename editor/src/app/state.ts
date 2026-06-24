@@ -1,5 +1,4 @@
 import { createExportNodeFromSources } from '../domain/export-tree';
-import { createDefaultExportTree } from '../domain/source-tree';
 import type { ExportKind, ExportNode, ListSettings, PSDUIProject } from '../schemas/psdui';
 import type { SourceLayer } from '../schemas/source';
 
@@ -16,6 +15,7 @@ export type SourceDocumentInput = Omit<PSDUIProject, 'exportTree' | 'cache'> & {
 };
 
 type ExportNodeUpdater = Partial<ExportNode> | ((node: ExportNode) => ExportNode);
+export type MoveDirection = 'up' | 'down';
 
 export function createEmptyState(): AppState {
   return {
@@ -96,7 +96,7 @@ export function createProjectFromSourceDocument(sourceDocument: SourceDocumentIn
     source: sourceDocument.source,
     document: sourceDocument.document,
     sourceTree: sourceDocument.sourceTree,
-    exportTree: createDefaultExportTree(sourceDocument.sourceTree),
+    exportTree: [],
     cache: {
       assetsDir: sourceDocument.assetsDir
     }
@@ -106,7 +106,7 @@ export function createProjectFromSourceDocument(sourceDocument: SourceDocumentIn
 export function createExportNodeForSources(
   id: string,
   sourceLayers: SourceLayer[],
-  exportKind: ExportKind = 'image'
+  exportKind: ExportKind = inferExportKind(sourceLayers[0])
 ): ExportNode {
   const firstSource = sourceLayers[0];
 
@@ -118,11 +118,49 @@ export function createExportNodeForSources(
   });
 }
 
+export function addSourceLayerToExportTree(state: AppState, layerId: number): AppState {
+  if (state.project === null) {
+    return {
+      ...state,
+      message: 'Open a PSD/PSB before adding export nodes.'
+    };
+  }
+
+  const sourceLayer = findSourceLayersByIds(state.project.sourceTree, [layerId])[0];
+
+  if (sourceLayer === undefined) {
+    return {
+      ...state,
+      message: `Source layer "${layerId}" was not found.`
+    };
+  }
+
+  if (isSourceLayerAlreadyExported(state.project.exportTree, layerId)) {
+    return {
+      ...state,
+      message: `Source layer "${sourceLayer.name}" is already in the export tree.`
+    };
+  }
+
+  return appendExportNode(state, createExportNodeForSources(`source_${sourceLayer.id}`, [sourceLayer]));
+}
+
 export function appendExportNode(state: AppState, node: ExportNode): AppState {
   if (state.project === null) {
     return {
       ...state,
       message: 'Open a PSD/PSB before creating export nodes.'
+    };
+  }
+
+  const duplicatedSourceLayerIds = node.sourceLayerIds.filter((sourceLayerId) =>
+    isSourceLayerAlreadyExported(state.project!.exportTree, sourceLayerId)
+  );
+
+  if (duplicatedSourceLayerIds.length > 0) {
+    return {
+      ...state,
+      message: `Source layer ids already exist in Export Tree: ${duplicatedSourceLayerIds.join(', ')}.`
     };
   }
 
@@ -163,8 +201,27 @@ export function removeExportNode(state: AppState, nodeId: string): AppState {
       exportTree: removeExportNodeFromTree(state.project.exportTree, nodeId)
     },
     selectedExportNodeId: state.selectedExportNodeId === nodeId ? null : state.selectedExportNodeId,
-    message: `Unmerged export node "${nodeId}".`
+    message: `Removed export node "${nodeId}".`
   };
+}
+
+export function moveExportNode(state: AppState, nodeId: string, direction: MoveDirection): AppState {
+  if (state.project === null) {
+    return state;
+  }
+
+  return {
+    ...state,
+    project: {
+      ...state.project,
+      exportTree: moveExportNodeInTree(state.project.exportTree, nodeId, direction)
+    },
+    selectedExportNodeId: nodeId
+  };
+}
+
+export function collectExportedSourceLayerIds(exportTree: ExportNode[]): number[] {
+  return [...new Set(flattenExportNodes(exportTree).flatMap((node) => node.sourceLayerIds))];
 }
 
 function collectSourceLayerAndDescendantIds(sourceTree: SourceLayer[], layerId: number): number[] {
@@ -180,6 +237,10 @@ function collectSourceLayerAndDescendantIds(sourceTree: SourceLayer[], layerId: 
   }
 
   return [];
+}
+
+function isSourceLayerAlreadyExported(exportTree: ExportNode[], layerId: number): boolean {
+  return collectExportedSourceLayerIds(exportTree).includes(layerId);
 }
 
 function updateExportTree(
@@ -200,6 +261,32 @@ function updateExportTree(
   });
 }
 
+function moveExportNodeInTree(
+  exportTree: ExportNode[],
+  nodeId: string,
+  direction: MoveDirection
+): ExportNode[] {
+  const index = exportTree.findIndex((node) => node.id === nodeId);
+
+  if (index >= 0) {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+
+    if (targetIndex < 0 || targetIndex >= exportTree.length) {
+      return exportTree;
+    }
+
+    const nextTree = [...exportTree];
+    const [node] = nextTree.splice(index, 1);
+    nextTree.splice(targetIndex, 0, node);
+    return nextTree;
+  }
+
+  return exportTree.map((node) => ({
+    ...node,
+    children: moveExportNodeInTree(node.children, nodeId, direction)
+  }));
+}
+
 function removeExportNodeFromTree(exportTree: ExportNode[], nodeId: string): ExportNode[] {
   return exportTree
     .filter((node) => node.id !== nodeId)
@@ -207,6 +294,18 @@ function removeExportNodeFromTree(exportTree: ExportNode[], nodeId: string): Exp
       ...node,
       children: removeExportNodeFromTree(node.children, nodeId)
     }));
+}
+
+function inferExportKind(sourceLayer: SourceLayer | undefined): ExportKind {
+  if (sourceLayer?.kind === 'group') {
+    return 'group';
+  }
+
+  if (sourceLayer?.text !== null && sourceLayer?.text !== undefined) {
+    return 'text';
+  }
+
+  return 'image';
 }
 
 function normalizeExportNode(node: ExportNode): ExportNode {

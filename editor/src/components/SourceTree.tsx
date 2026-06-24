@@ -9,7 +9,9 @@ interface SourceTreeProps {
   layers: SourceLayer[];
   selectedLayerIds: number[];
   hiddenLayerIds: number[];
+  exportedSourceLayerIds: number[];
   onSelectLayer: (layerId: number) => void;
+  onAddLayerToExportTree: (layerId: number) => void;
   onToggleLayerSelection: (layerId: number) => void;
   onToggleLayerVisibility: (layerId: number) => void;
 }
@@ -18,7 +20,9 @@ export function SourceTree({
   layers,
   selectedLayerIds,
   hiddenLayerIds,
+  exportedSourceLayerIds,
   onSelectLayer,
+  onAddLayerToExportTree,
   onToggleLayerSelection,
   onToggleLayerVisibility
 }: SourceTreeProps) {
@@ -35,7 +39,9 @@ export function SourceTree({
           depth={0}
           selectedLayerIds={selectedLayerIds}
           hiddenLayerIds={hiddenLayerIds}
+          exportedSourceLayerIds={exportedSourceLayerIds}
           onSelectLayer={onSelectLayer}
+          onAddLayerToExportTree={onAddLayerToExportTree}
           onToggleLayerSelection={onToggleLayerSelection}
           onToggleLayerVisibility={onToggleLayerVisibility}
         />
@@ -54,12 +60,15 @@ function SourceLayerRow({
   depth,
   selectedLayerIds,
   hiddenLayerIds,
+  exportedSourceLayerIds,
   onSelectLayer,
+  onAddLayerToExportTree,
   onToggleLayerSelection,
   onToggleLayerVisibility
 }: SourceLayerRowProps) {
   const isSelected = selectedLayerIds.includes(layer.id);
   const isPreviewVisible = layer.visible && !hiddenLayerIds.includes(layer.id);
+  const isExported = exportedSourceLayerIds.includes(layer.id);
 
   function selectLayer(event: MouseClickEvent) {
     if (event.metaKey || event.ctrlKey) {
@@ -96,6 +105,16 @@ function SourceLayerRow({
           <span className="tree-name">{layer.name}</span>
           <span className="tree-meta">{layer.kind}</span>
         </button>
+        <button
+          type="button"
+          className="icon-button add-export-button"
+          aria-label={`Add ${layer.name} to export tree`}
+          title={isExported ? 'Already in Export Tree' : 'Add to Export Tree'}
+          disabled={isExported}
+          onClick={() => onAddLayerToExportTree(layer.id)}
+        >
+          &gt;
+        </button>
       </div>
       {layer.children.map((child) => (
         <SourceLayerRow
@@ -104,7 +123,9 @@ function SourceLayerRow({
           depth={depth + 1}
           selectedLayerIds={selectedLayerIds}
           hiddenLayerIds={hiddenLayerIds}
+          exportedSourceLayerIds={exportedSourceLayerIds}
           onSelectLayer={onSelectLayer}
+          onAddLayerToExportTree={onAddLayerToExportTree}
           onToggleLayerSelection={onToggleLayerSelection}
           onToggleLayerVisibility={onToggleLayerVisibility}
         />

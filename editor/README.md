@@ -45,13 +45,15 @@ npm run dev
    read-only; raster previews are cached under the system temp directory. The
    default `.psdui` and `ui.layout.json` paths are derived automatically from
    the selected source file.
-2. In the Source Tree, use the eye button to hide/show a source subtree in the
-   preview, and use the checkbox to multi-select source layers.
+2. Export Tree starts empty. In the Source Tree, use the eye button to hide/show
+   a source subtree in the preview, the checkbox to multi-select source layers,
+   or the right-arrow button to add a single source layer to Export Tree.
 3. Click `Merge Selected Layers` in the Inspector or `Create Export Node` in the
    toolbar. When multiple source layers are selected, they are merged into one
    export node instead of creating one node per source layer.
-4. Use the Inspector to edit `name`, `enabled`, and `exportKind`. Merged export
-   nodes can be removed with `Unmerge Node`.
+4. Use Export Tree row actions to move nodes up/down or delete them. Use the
+   Inspector to edit `name`, `enabled`, and `exportKind`. Merged export nodes can
+   also be removed with `Unmerge Node`.
 5. To manually mark a node as a list, set `exportKind` to `list` in the
    Inspector, then configure `direction`, `spacing`, `cellTemplateNodeId`, and
    `padding`.
