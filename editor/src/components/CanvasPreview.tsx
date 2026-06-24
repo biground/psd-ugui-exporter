@@ -2,6 +2,7 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { useLayoutEffect, useRef, useState } from 'react';
 
 import { flattenExportNodes } from '../app/state';
+import { beginMiddleMousePan, moveCanvasPan, type CanvasPan, type CanvasPanDrag } from '../domain/canvas-pan';
 import { collectVisiblePreviewImageLayers, resolveLayerImagePath } from '../domain/preview-assets';
 import type { PSDUIProject } from '../schemas/psdui';
 
@@ -15,6 +16,8 @@ export function CanvasPreview({ project, selectedExportNodeId }: CanvasPreviewPr
   const [fitZoom, setFitZoom] = useState(1);
   const [manualZoom, setManualZoom] = useState(1);
   const [zoomMode, setZoomMode] = useState<'fit' | 'manual'>('fit');
+  const [pan, setPan] = useState<CanvasPan>({ x: 0, y: 0 });
+  const [panDrag, setPanDrag] = useState<CanvasPanDrag | null>(null);
 
   const effectiveZoom = zoomMode === 'fit' ? fitZoom : manualZoom;
 
@@ -47,6 +50,11 @@ export function CanvasPreview({ project, selectedExportNodeId }: CanvasPreviewPr
     return () => resizeObserver.disconnect();
   }, [project]);
 
+  useLayoutEffect(() => {
+    setPan({ x: 0, y: 0 });
+    setPanDrag(null);
+  }, [project]);
+
   if (project === null) {
     return (
       <section className="canvas-placeholder">
@@ -72,7 +80,14 @@ export function CanvasPreview({ project, selectedExportNodeId }: CanvasPreviewPr
           </span>
         </div>
         <div className="canvas-controls" aria-label="Canvas zoom controls">
-          <button type="button" onClick={() => setZoomMode('fit')} aria-pressed={zoomMode === 'fit'}>
+          <button
+            type="button"
+            onClick={() => {
+              setZoomMode('fit');
+              setPan({ x: 0, y: 0 });
+            }}
+            aria-pressed={zoomMode === 'fit'}
+          >
             Fit
           </button>
           <button
@@ -101,6 +116,7 @@ export function CanvasPreview({ project, selectedExportNodeId }: CanvasPreviewPr
             onClick={() => {
               setZoomMode('manual');
               setManualZoom(1);
+              setPan({ x: 0, y: 0 });
             }}
             aria-pressed={zoomMode === 'manual' && manualZoom === 1}
           >
@@ -108,12 +124,49 @@ export function CanvasPreview({ project, selectedExportNodeId }: CanvasPreviewPr
           </button>
         </div>
       </div>
-      <div className="canvas-shell" ref={shellRef}>
+      <div
+        className={`canvas-shell ${panDrag !== null ? 'panning' : ''}`}
+        ref={shellRef}
+        onPointerDown={(event: CanvasPointerEvent) => {
+          const nextDrag = beginMiddleMousePan(event.button, event.clientX, event.clientY, pan);
+          if (nextDrag === null) {
+            return;
+          }
+
+          event.preventDefault();
+          event.currentTarget.setPointerCapture(event.pointerId);
+          setPanDrag(nextDrag);
+        }}
+        onPointerMove={(event: CanvasPointerEvent) => {
+          if (panDrag === null) {
+            return;
+          }
+
+          event.preventDefault();
+          setPan(moveCanvasPan(panDrag, event.clientX, event.clientY));
+        }}
+        onPointerUp={(event: CanvasPointerEvent) => {
+          if (panDrag === null) {
+            return;
+          }
+
+          event.preventDefault();
+          event.currentTarget.releasePointerCapture(event.pointerId);
+          setPanDrag(null);
+        }}
+        onPointerCancel={() => setPanDrag(null)}
+        onAuxClick={(event: CanvasPointerEvent) => {
+          if (event.button === 1) {
+            event.preventDefault();
+          }
+        }}
+      >
         <div
           className="canvas-board"
           style={{
             width: `${documentWidth * effectiveZoom}px`,
-            height: `${documentHeight * effectiveZoom}px`
+            height: `${documentHeight * effectiveZoom}px`,
+            transform: `translate(${pan.x}px, ${pan.y}px)`
           }}
         >
           {imageLayers.map(({ layer }) => {
@@ -168,4 +221,16 @@ export function CanvasPreview({ project, selectedExportNodeId }: CanvasPreviewPr
 
 function clampZoom(value: number): number {
   return Math.min(4, Math.max(0.1, Math.round(value * 100) / 100));
+}
+
+interface CanvasPointerEvent {
+  button: number;
+  clientX: number;
+  clientY: number;
+  pointerId: number;
+  preventDefault: () => void;
+  currentTarget: {
+    setPointerCapture: (pointerId: number) => void;
+    releasePointerCapture: (pointerId: number) => void;
+  };
 }

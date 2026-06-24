@@ -301,6 +301,14 @@ body {
   margin: 0;
 }
 
+html,
+body,
+#root {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
 button,
 input,
 select {
@@ -322,9 +330,11 @@ button:disabled {
 }
 
 .app-shell {
-  min-height: 100vh;
+  height: 100vh;
+  min-height: 0;
   display: grid;
   grid-template-rows: auto 1fr;
+  overflow: hidden;
 }
 
 .app-shell.is-empty {
@@ -475,12 +485,13 @@ button:disabled {
   display: grid;
   grid-template-columns: minmax(220px, 280px) minmax(220px, 280px) minmax(360px, 1fr) minmax(260px, 320px);
   min-height: 0;
+  overflow: hidden;
 }
 
 .tree-panel,
 .right-panel {
   min-height: 0;
-  overflow: auto;
+  overflow: hidden;
   background: #f8fafc;
 }
 
@@ -496,6 +507,13 @@ button:disabled {
 .inspector,
 .inspector-empty {
   padding: 14px;
+}
+
+.panel-section {
+  height: 100%;
+  min-height: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
 }
 
 .panel-section + .panel-section {
@@ -520,7 +538,10 @@ h2 {
 
 .tree {
   display: grid;
+  align-content: start;
   gap: 3px;
+  min-height: 0;
+  overflow: auto;
 }
 
 .tree-row {
@@ -644,9 +665,15 @@ h2 {
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: auto;
+  overflow: hidden;
   border: 1px solid #d8dee8;
   background: #e5eaf1;
+  cursor: grab;
+  user-select: none;
+}
+
+.canvas-shell.panning {
+  cursor: grabbing;
 }
 
 .canvas-board {
@@ -702,7 +729,15 @@ h2 {
 
 .inspector {
   display: grid;
+  align-content: start;
   gap: 12px;
+}
+
+.right-panel > .inspector,
+.right-panel > .inspector-empty {
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
 }
 
 .checkbox-field {

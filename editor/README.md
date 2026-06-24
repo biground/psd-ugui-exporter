@@ -54,8 +54,10 @@ npm run dev
 5. To manually mark a node as a list, set `exportKind` to `list` in the
    Inspector, then configure `direction`, `spacing`, `cellTemplateNodeId`, and
    `padding`.
-6. Save the `.psdui` file.
-7. Export `ui.layout.json`.
+6. Use the preview zoom controls for scale, and middle-mouse drag the preview
+   canvas to pan.
+7. Save the `.psdui` file.
+8. Export `ui.layout.json`.
 
 Manual path overrides live in `Project Settings`; the main toolbar keeps the
 default workflow focused on choosing a source file and editing export semantics.
