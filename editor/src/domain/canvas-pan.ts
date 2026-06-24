@@ -34,3 +34,16 @@ export function moveCanvasPan(drag: CanvasPanDrag, clientX: number, clientY: num
     y: drag.startPanY + clientY - drag.startClientY
   };
 }
+
+export function calculateWheelZoom(currentZoom: number, deltaY: number): number {
+  if (deltaY === 0) {
+    return clampZoom(currentZoom);
+  }
+
+  const step = deltaY < 0 ? 0.1 : -0.1;
+  return clampZoom(currentZoom + step);
+}
+
+function clampZoom(value: number): number {
+  return Math.min(4, Math.max(0.1, Math.round(value * 100) / 100));
+}

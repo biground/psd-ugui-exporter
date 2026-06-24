@@ -54,8 +54,8 @@ npm run dev
 5. To manually mark a node as a list, set `exportKind` to `list` in the
    Inspector, then configure `direction`, `spacing`, `cellTemplateNodeId`, and
    `padding`.
-6. Use the preview zoom controls for scale, and middle-mouse drag the preview
-   canvas to pan.
+6. Use the preview zoom controls or mouse wheel for scale, and middle-mouse
+   drag the preview canvas to pan.
 7. Save the `.psdui` file.
 8. Export `ui.layout.json`.
 

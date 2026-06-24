@@ -2,7 +2,13 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { useLayoutEffect, useRef, useState } from 'react';
 
 import { flattenExportNodes } from '../app/state';
-import { beginMiddleMousePan, moveCanvasPan, type CanvasPan, type CanvasPanDrag } from '../domain/canvas-pan';
+import {
+  beginMiddleMousePan,
+  calculateWheelZoom,
+  moveCanvasPan,
+  type CanvasPan,
+  type CanvasPanDrag
+} from '../domain/canvas-pan';
 import { collectVisiblePreviewImageLayers, resolveLayerImagePath } from '../domain/preview-assets';
 import type { PSDUIProject } from '../schemas/psdui';
 
@@ -160,6 +166,13 @@ export function CanvasPreview({ project, selectedExportNodeId }: CanvasPreviewPr
             event.preventDefault();
           }
         }}
+        onWheel={(event: CanvasWheelEvent) => {
+          event.preventDefault();
+          setZoomMode('manual');
+          setManualZoom((current) =>
+            calculateWheelZoom(zoomMode === 'fit' ? effectiveZoom : current, event.deltaY)
+          );
+        }}
       >
         <div
           className="canvas-board"
@@ -233,4 +246,9 @@ interface CanvasPointerEvent {
     setPointerCapture: (pointerId: number) => void;
     releasePointerCapture: (pointerId: number) => void;
   };
+}
+
+interface CanvasWheelEvent {
+  deltaY: number;
+  preventDefault: () => void;
 }
