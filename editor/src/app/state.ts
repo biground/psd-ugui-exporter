@@ -135,14 +135,26 @@ export function addSourceLayerToExportTree(state: AppState, layerId: number): Ap
     };
   }
 
-  if (isSourceLayerAlreadyExported(state.project.exportTree, layerId)) {
+  const sourceLayerIds = flattenSourceLayers([sourceLayer]).map((layer) => layer.id);
+  const duplicatedSourceLayerIds = sourceLayerIds.filter((sourceLayerId) =>
+    isSourceLayerAlreadyExported(state.project!.exportTree, sourceLayerId)
+  );
+
+  if (duplicatedSourceLayerIds.length > 0 && duplicatedSourceLayerIds.includes(layerId)) {
     return {
       ...state,
       message: `Source layer "${sourceLayer.name}" is already in the export tree.`
     };
   }
 
-  return appendExportNode(state, createExportNodeForSources(`source_${sourceLayer.id}`, [sourceLayer]));
+  if (duplicatedSourceLayerIds.length > 0) {
+    return {
+      ...state,
+      message: `Source layer "${sourceLayer.name}" overlaps with existing export nodes.`
+    };
+  }
+
+  return appendExportNode(state, createExportNodeFromSourceSubtree(sourceLayer));
 }
 
 export function appendExportNode(state: AppState, node: ExportNode): AppState {
@@ -306,6 +318,13 @@ function inferExportKind(sourceLayer: SourceLayer | undefined): ExportKind {
   }
 
   return 'image';
+}
+
+function createExportNodeFromSourceSubtree(sourceLayer: SourceLayer): ExportNode {
+  return {
+    ...createExportNodeForSources(`source_${sourceLayer.id}`, [sourceLayer]),
+    children: sourceLayer.children.map((child) => createExportNodeFromSourceSubtree(child))
+  };
 }
 
 function normalizeExportNode(node: ExportNode): ExportNode {

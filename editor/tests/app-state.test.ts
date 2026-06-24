@@ -164,6 +164,79 @@ describe('app state', () => {
     expect(duplicate.message).toBe('Source layer "Logo" is already in the export tree.');
   });
 
+  test('adds a source subtree to the export tree and prevents parent-child duplicates', () => {
+    const state = {
+      ...createEmptyState(),
+      project: createProjectFromSourceDocument({
+        version: 1 as const,
+        source: {
+          path: '/tmp/menu.psb',
+          fileName: 'menu.psb'
+        },
+        document: {
+          width: 320,
+          height: 180
+        },
+        sourceTree: [
+          {
+            ...baseLayer,
+            id: 1,
+            name: 'Button',
+            kind: 'group',
+            children: [
+              {
+                ...baseLayer,
+                id: 2,
+                name: 'Button BG',
+                image: { path: 'cache/bg.png', width: 10, height: 10 }
+              },
+              {
+                ...baseLayer,
+                id: 3,
+                name: 'Button Text',
+                kind: 'text',
+                text: { value: 'OK' }
+              }
+            ]
+          }
+        ],
+        assetsDir: 'layers'
+      })
+    };
+
+    const addedParent = addSourceLayerToExportTree(state, 1);
+    const duplicateChild = addSourceLayerToExportTree(addedParent, 2);
+    const childFirst = addSourceLayerToExportTree(state, 2);
+    const duplicateParent = addSourceLayerToExportTree(childFirst, 1);
+
+    expect(addedParent.project?.exportTree).toMatchObject([
+      {
+        id: 'source_1',
+        name: 'Button',
+        exportKind: 'group',
+        sourceLayerIds: [1],
+        children: [
+          {
+            id: 'source_2',
+            name: 'Button BG',
+            exportKind: 'image',
+            sourceLayerIds: [2]
+          },
+          {
+            id: 'source_3',
+            name: 'Button Text',
+            exportKind: 'text',
+            sourceLayerIds: [3]
+          }
+        ]
+      }
+    ]);
+    expect(duplicateChild.project?.exportTree).toHaveLength(1);
+    expect(duplicateChild.message).toBe('Source layer "Button BG" is already in the export tree.');
+    expect(duplicateParent.project?.exportTree).toHaveLength(1);
+    expect(duplicateParent.message).toBe('Source layer "Button" overlaps with existing export nodes.');
+  });
+
   test('creates and removes a merged export node from selected source layers', () => {
     const sourceLayers = [
       {

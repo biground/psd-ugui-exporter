@@ -728,6 +728,32 @@ h2 {
   color: #b42318;
 }
 
+.delete-icon {
+  position: relative;
+  width: 11px;
+  height: 11px;
+}
+
+.delete-icon::before,
+.delete-icon::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 0;
+  width: 1.5px;
+  height: 12px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.delete-icon::before {
+  transform: rotate(45deg);
+}
+
+.delete-icon::after {
+  transform: rotate(-45deg);
+}
+
 .tree-row:hover {
   background: #eef4fb;
 }
@@ -810,6 +836,21 @@ h2 {
   flex: 0 0 auto;
   gap: 6px;
   align-items: center;
+}
+
+.canvas-preview-toggle {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid #cbd3df;
+  border-radius: 7px;
+  background: #ffffff;
+}
+
+.canvas-preview-toggle button {
+  min-height: 28px;
+  border-color: transparent;
+  border-radius: 5px;
 }
 
 .canvas-controls button {

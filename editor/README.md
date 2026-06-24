@@ -47,7 +47,8 @@ npm run dev
    the selected source file.
 2. Export Tree starts empty. In the Source Tree, use the eye button to hide/show
    a source subtree in the preview, the checkbox to multi-select source layers,
-   or the right-arrow button to add a single source layer to Export Tree.
+   or the right-arrow button to add a source layer and its children to Export
+   Tree.
 3. Click `Merge Selected Layers` in the Inspector or `Create Export Node` in the
    toolbar. When multiple source layers are selected, they are merged into one
    export node instead of creating one node per source layer.
@@ -57,8 +58,9 @@ npm run dev
 5. To manually mark a node as a list, set `exportKind` to `list` in the
    Inspector, then configure `direction`, `spacing`, `cellTemplateNodeId`, and
    `padding`.
-6. Use the preview zoom controls or mouse wheel for scale, and middle-mouse
-   drag the preview canvas to pan.
+6. Switch the canvas between `Source` and `Export` preview modes. Use the
+   preview zoom controls or mouse wheel for scale, and middle-mouse drag the
+   preview canvas to pan.
 7. Save the `.psdui` file.
 8. Export `ui.layout.json`.
 

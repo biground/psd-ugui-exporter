@@ -96,7 +96,7 @@ function ExportNodeRow({
             title="Delete"
             onClick={() => onDeleteNode(node.id)}
           >
-            x
+            <span className="delete-icon" aria-hidden="true" />
           </button>
         </div>
       </div>

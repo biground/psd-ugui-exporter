@@ -50,6 +50,17 @@ describe('preview assets', () => {
     expect(layers[0].children[0]?.visible).toBe(true);
   });
 
+  test('collects only included source layers when an include list is provided', () => {
+    const layers: SourceLayer[] = [
+      { ...baseLayer, id: 1, name: 'Source Only' },
+      { ...baseLayer, id: 2, name: 'Exported' }
+    ];
+
+    expect(collectVisiblePreviewImageLayers(layers, [], [2]).map(({ layer }) => layer.name)).toEqual([
+      'Exported'
+    ]);
+  });
+
   test('resolves relative layer image paths under the cache root', () => {
     const layer: SourceLayer = { ...baseLayer, id: 1, name: 'Icon' };
 

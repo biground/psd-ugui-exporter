@@ -68,7 +68,7 @@ function SourceLayerRow({
 }: SourceLayerRowProps) {
   const isSelected = selectedLayerIds.includes(layer.id);
   const isPreviewVisible = layer.visible && !hiddenLayerIds.includes(layer.id);
-  const isExported = exportedSourceLayerIds.includes(layer.id);
+  const hasExportedSourceInSubtree = containsExportedSourceLayer(layer, exportedSourceLayerIds);
 
   function selectLayer(event: MouseClickEvent) {
     if (event.metaKey || event.ctrlKey) {
@@ -109,8 +109,8 @@ function SourceLayerRow({
           type="button"
           className="icon-button add-export-button"
           aria-label={`Add ${layer.name} to export tree`}
-          title={isExported ? 'Already in Export Tree' : 'Add to Export Tree'}
-          disabled={isExported}
+          title={hasExportedSourceInSubtree ? 'Already in Export Tree' : 'Add to Export Tree'}
+          disabled={hasExportedSourceInSubtree}
           onClick={() => onAddLayerToExportTree(layer.id)}
         >
           &gt;
@@ -132,4 +132,9 @@ function SourceLayerRow({
       ))}
     </div>
   );
+}
+
+function containsExportedSourceLayer(layer: SourceLayer, exportedSourceLayerIds: number[]): boolean {
+  return exportedSourceLayerIds.includes(layer.id)
+    || layer.children.some((child) => containsExportedSourceLayer(child, exportedSourceLayerIds));
 }

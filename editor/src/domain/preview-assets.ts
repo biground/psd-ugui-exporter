@@ -7,10 +7,14 @@ export interface PreviewImageLayer {
 
 export function collectVisiblePreviewImageLayers(
   sourceTree: SourceLayer[],
-  hiddenSourceLayerIds: number[] = []
+  hiddenSourceLayerIds: number[] = [],
+  includedSourceLayerIds: number[] | null = null
 ): PreviewImageLayer[] {
   const hiddenIds = new Set(hiddenSourceLayerIds);
-  return sourceTree.flatMap((layer) => collectVisiblePreviewImageLayer(layer, true, hiddenIds));
+  const includedIds = includedSourceLayerIds === null ? null : new Set(includedSourceLayerIds);
+  return sourceTree.flatMap((layer) =>
+    collectVisiblePreviewImageLayer(layer, true, hiddenIds, includedIds)
+  );
 }
 
 export function resolveLayerImagePath(layer: SourceLayer, cacheRoot: string): string | null {
@@ -28,14 +32,15 @@ export function resolveLayerImagePath(layer: SourceLayer, cacheRoot: string): st
 function collectVisiblePreviewImageLayer(
   layer: SourceLayer,
   ancestorsVisible: boolean,
-  hiddenIds: Set<number>
+  hiddenIds: Set<number>,
+  includedIds: Set<number> | null
 ): PreviewImageLayer[] {
   const isVisible = ancestorsVisible && layer.visible && !hiddenIds.has(layer.id);
   const children = layer.children.flatMap((child) =>
-    collectVisiblePreviewImageLayer(child, isVisible, hiddenIds)
+    collectVisiblePreviewImageLayer(child, isVisible, hiddenIds, includedIds)
   );
 
-  if (!isVisible || layer.image === null) {
+  if (!isVisible || layer.image === null || (includedIds !== null && !includedIds.has(layer.id))) {
     return children;
   }
 

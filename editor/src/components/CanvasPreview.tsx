@@ -1,7 +1,7 @@
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useLayoutEffect, useRef, useState } from 'react';
 
-import { flattenExportNodes } from '../app/state';
+import { collectExportedSourceLayerIds, flattenExportNodes } from '../app/state';
 import {
   beginMiddleMousePan,
   calculateWheelZoom,
@@ -27,6 +27,7 @@ export function CanvasPreview({
   const [fitZoom, setFitZoom] = useState(1);
   const [manualZoom, setManualZoom] = useState(1);
   const [zoomMode, setZoomMode] = useState<'fit' | 'manual'>('fit');
+  const [previewMode, setPreviewMode] = useState<'source' | 'export'>('source');
   const [pan, setPan] = useState<CanvasPan>({ x: 0, y: 0 });
   const [panDrag, setPanDrag] = useState<CanvasPanDrag | null>(null);
 
@@ -78,13 +79,18 @@ export function CanvasPreview({
   const documentWidth = Math.max(1, project.document.width);
   const documentHeight = Math.max(1, project.document.height);
   const nodes = flattenExportNodes(project.exportTree);
+  const exportedSourceLayerIds = collectExportedSourceLayerIds(project.exportTree);
   const hiddenLayerIds = new Set(hiddenSourceLayerIds);
   const visibleNodes = nodes.filter(
     (node) =>
       node.sourceLayerIds.length === 0
       || node.sourceLayerIds.some((sourceLayerId) => !hiddenLayerIds.has(sourceLayerId))
   );
-  const imageLayers = collectVisiblePreviewImageLayers(project.sourceTree, hiddenSourceLayerIds);
+  const imageLayers = collectVisiblePreviewImageLayers(
+    project.sourceTree,
+    hiddenSourceLayerIds,
+    previewMode === 'source' ? null : exportedSourceLayerIds
+  );
   const zoomLabel = `${Math.round(effectiveZoom * 100)}%`;
 
   return (
@@ -97,6 +103,22 @@ export function CanvasPreview({
           </span>
         </div>
         <div className="canvas-controls" aria-label="Canvas zoom controls">
+          <div className="canvas-preview-toggle" aria-label="Canvas preview mode">
+            <button
+              type="button"
+              onClick={() => setPreviewMode('source')}
+              aria-pressed={previewMode === 'source'}
+            >
+              Source
+            </button>
+            <button
+              type="button"
+              onClick={() => setPreviewMode('export')}
+              aria-pressed={previewMode === 'export'}
+            >
+              Export
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => {
@@ -216,7 +238,7 @@ export function CanvasPreview({
               />
             );
           })}
-          {visibleNodes.map((node) => {
+          {(previewMode === 'source' ? [] : visibleNodes).map((node) => {
             const isSelected = selectedExportNodeId === node.id;
 
             return (
