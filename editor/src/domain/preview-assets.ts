@@ -5,6 +5,11 @@ export interface PreviewImageLayer {
   imagePath: string;
 }
 
+export interface PreviewTextLayer {
+  layer: SourceLayer;
+  value: string;
+}
+
 export function collectVisiblePreviewImageLayers(
   sourceTree: SourceLayer[],
   hiddenSourceLayerIds: number[] = [],
@@ -14,6 +19,18 @@ export function collectVisiblePreviewImageLayers(
   const includedIds = includedSourceLayerIds === null ? null : new Set(includedSourceLayerIds);
   return sourceTree.flatMap((layer) =>
     collectVisiblePreviewImageLayer(layer, true, hiddenIds, includedIds)
+  );
+}
+
+export function collectVisiblePreviewTextLayers(
+  sourceTree: SourceLayer[],
+  hiddenSourceLayerIds: number[] = [],
+  includedSourceLayerIds: number[] | null = null
+): PreviewTextLayer[] {
+  const hiddenIds = new Set(hiddenSourceLayerIds);
+  const includedIds = includedSourceLayerIds === null ? null : new Set(includedSourceLayerIds);
+  return sourceTree.flatMap((layer) =>
+    collectVisiblePreviewTextLayer(layer, true, hiddenIds, includedIds)
   );
 }
 
@@ -49,6 +66,30 @@ function collectVisiblePreviewImageLayer(
     {
       layer,
       imagePath: layer.image.path
+    }
+  ];
+}
+
+function collectVisiblePreviewTextLayer(
+  layer: SourceLayer,
+  ancestorsVisible: boolean,
+  hiddenIds: Set<number>,
+  includedIds: Set<number> | null
+): PreviewTextLayer[] {
+  const isVisible = ancestorsVisible && layer.visible && !hiddenIds.has(layer.id);
+  const children = layer.children.flatMap((child) =>
+    collectVisiblePreviewTextLayer(child, isVisible, hiddenIds, includedIds)
+  );
+
+  if (!isVisible || layer.text === null || (includedIds !== null && !includedIds.has(layer.id))) {
+    return children;
+  }
+
+  return [
+    ...children,
+    {
+      layer,
+      value: layer.text.value
     }
   ];
 }

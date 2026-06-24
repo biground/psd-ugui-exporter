@@ -10,8 +10,13 @@ import {
   type CanvasPanDrag
 } from '../domain/canvas-pan';
 import { collectCanvasHighlights, type PreviewMode } from '../domain/preview-highlights';
-import { collectVisiblePreviewImageLayers, resolveLayerImagePath } from '../domain/preview-assets';
+import {
+  collectVisiblePreviewImageLayers,
+  collectVisiblePreviewTextLayers,
+  resolveLayerImagePath
+} from '../domain/preview-assets';
 import type { PSDUIProject } from '../schemas/psdui';
+import type { SourceText } from '../schemas/source';
 
 interface CanvasPreviewProps {
   project: PSDUIProject | null;
@@ -96,6 +101,11 @@ export function CanvasPreview({
   const documentHeight = Math.max(1, project.document.height);
   const exportedSourceLayerIds = collectExportedSourceLayerIds(project.exportTree);
   const imageLayers = collectVisiblePreviewImageLayers(
+    project.sourceTree,
+    hiddenSourceLayerIds,
+    previewMode === 'source' ? null : exportedSourceLayerIds
+  );
+  const textLayers = collectVisiblePreviewTextLayers(
     project.sourceTree,
     hiddenSourceLayerIds,
     previewMode === 'source' ? null : exportedSourceLayerIds
@@ -255,6 +265,33 @@ export function CanvasPreview({
               />
             );
           })}
+          {textLayers.map(({ layer, value }) => {
+            const text = layer.text;
+            const fontSize = resolveTextFontSize(text, layer.sourceBounds.height, effectiveZoom);
+
+            return (
+              <div
+                key={layer.id}
+                className="canvas-text-layer"
+                style={{
+                  left: `${(layer.sourceBounds.x / documentWidth) * 100}%`,
+                  top: `${(layer.sourceBounds.y / documentHeight) * 100}%`,
+                  width: `${(layer.sourceBounds.width / documentWidth) * 100}%`,
+                  height: `${(layer.sourceBounds.height / documentHeight) * 100}%`,
+                  color: resolveTextColor(text),
+                  fontFamily: resolveTextFontFamily(text),
+                  fontSize: `${fontSize}px`,
+                  opacity: layer.opacity,
+                  textAlign: resolveTextAlign(text),
+                  lineHeight: 1.1
+                }}
+                title={layer.name}
+                aria-label={`${layer.name} text preview`}
+              >
+                {value}
+              </div>
+            );
+          })}
           {highlights.map((highlight) => {
             return (
               <div
@@ -281,6 +318,54 @@ export function CanvasPreview({
 
 function clampZoom(value: number): number {
   return Math.min(4, Math.max(0.1, Math.round(value * 100) / 100));
+}
+
+function resolveTextFontSize(text: SourceText | null, boundsHeight: number, zoom: number): number {
+  const size = typeof text?.fontSize === 'number' && text.fontSize > 0
+    ? text.fontSize
+    : Math.max(10, boundsHeight * 0.7);
+
+  return Math.max(1, Math.round(size * zoom * 100) / 100);
+}
+
+function resolveTextColor(text: SourceText | null): string {
+  const color = text?.color;
+
+  if (
+    typeof color === 'object'
+    && color !== null
+    && 'hex' in color
+    && typeof color.hex === 'string'
+  ) {
+    return color.hex;
+  }
+
+  return '#111827';
+}
+
+function resolveTextFontFamily(text: SourceText | null): string {
+  if (typeof text?.fontName === 'string' && text.fontName.trim().length > 0) {
+    return `${JSON.stringify(text.fontName)}, Inter, ui-sans-serif, system-ui, sans-serif`;
+  }
+
+  return 'Inter, ui-sans-serif, system-ui, sans-serif';
+}
+
+function resolveTextAlign(text: SourceText | null): 'left' | 'right' | 'center' | 'justify' {
+  const alignment = text?.alignment;
+  const name =
+    typeof alignment === 'object'
+      && alignment !== null
+      && 'name' in alignment
+      && typeof alignment.name === 'string'
+      ? alignment.name
+      : null;
+
+  if (name === 'right' || name === 'center' || name === 'justify') {
+    return name;
+  }
+
+  return 'left';
 }
 
 interface CanvasPointerEvent {

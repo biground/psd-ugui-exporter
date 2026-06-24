@@ -911,6 +911,16 @@ h2 {
   user-select: none;
 }
 
+.canvas-text-layer {
+  position: absolute;
+  display: block;
+  overflow: hidden;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  user-select: none;
+}
+
 .canvas-highlight {
   position: absolute;
   display: block;

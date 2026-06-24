@@ -1,6 +1,10 @@
 import { describe, expect, test } from 'vitest';
 
-import { collectVisiblePreviewImageLayers, resolveLayerImagePath } from '../src/domain/preview-assets';
+import {
+  collectVisiblePreviewImageLayers,
+  collectVisiblePreviewTextLayers,
+  resolveLayerImagePath
+} from '../src/domain/preview-assets';
 import type { SourceLayer } from '../src/schemas/source';
 
 const baseLayer = {
@@ -59,6 +63,54 @@ describe('preview assets', () => {
     expect(collectVisiblePreviewImageLayers(layers, [], [2]).map(({ layer }) => layer.name)).toEqual([
       'Exported'
     ]);
+  });
+
+  test('collects visible text layers for preview using the same visibility and include filters', () => {
+    const layers: SourceLayer[] = [
+      {
+        ...baseLayer,
+        id: 1,
+        name: 'Menu',
+        kind: 'group',
+        image: null,
+        children: [
+          {
+            ...baseLayer,
+            id: 2,
+            name: 'Title',
+            kind: 'text',
+            image: null,
+            text: { value: 'Start', fontName: 'Arial', fontSize: 24, color: { hex: '#ffffff' } }
+          },
+          {
+            ...baseLayer,
+            id: 3,
+            name: 'Hidden Label',
+            kind: 'text',
+            visible: false,
+            image: null,
+            text: { value: 'Hidden' }
+          },
+          {
+            ...baseLayer,
+            id: 4,
+            name: 'Export Only',
+            kind: 'text',
+            image: null,
+            text: { value: 'Export' }
+          }
+        ]
+      }
+    ];
+
+    expect(collectVisiblePreviewTextLayers(layers).map(({ layer }) => layer.name)).toEqual([
+      'Title',
+      'Export Only'
+    ]);
+    expect(collectVisiblePreviewTextLayers(layers, [], [4]).map(({ layer }) => layer.name)).toEqual([
+      'Export Only'
+    ]);
+    expect(collectVisiblePreviewTextLayers(layers, [1, 2, 3, 4]).map(({ layer }) => layer.name)).toEqual([]);
   });
 
   test('resolves relative layer image paths under the cache root', () => {
