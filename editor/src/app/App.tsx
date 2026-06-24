@@ -296,6 +296,7 @@ export function App() {
               </aside>
               <CanvasPreview
                 project={project}
+                selectedSourceLayerIds={state.selectedSourceLayerIds}
                 selectedExportNodeId={state.selectedExportNodeId}
                 hiddenSourceLayerIds={state.hiddenSourceLayerIds}
               />
@@ -910,26 +911,27 @@ h2 {
   user-select: none;
 }
 
-.canvas-node {
+.canvas-highlight {
   position: absolute;
   display: block;
   overflow: hidden;
   min-height: 0;
-  border: 1px solid #2563eb;
+  border: 2px solid #dc2626;
   border-radius: 3px;
-  background: rgba(37, 99, 235, 0.08);
-  color: #1d4ed8;
-  padding: 2px;
-  text-align: left;
-}
-
-.canvas-node.selected {
-  border-color: #dc2626;
   background: rgba(220, 38, 38, 0.12);
   color: #991b1b;
+  padding: 2px;
+  text-align: left;
+  pointer-events: none;
 }
 
-.canvas-node span {
+.canvas-highlight.source {
+  border-color: #2563eb;
+  background: rgba(37, 99, 235, 0.1);
+  color: #1d4ed8;
+}
+
+.canvas-highlight span {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;

@@ -1,7 +1,7 @@
 import { convertFileSrc } from '@tauri-apps/api/core';
 import { useLayoutEffect, useRef, useState } from 'react';
 
-import { collectExportedSourceLayerIds, flattenExportNodes } from '../app/state';
+import { collectExportedSourceLayerIds } from '../app/state';
 import {
   beginMiddleMousePan,
   calculateWheelZoom,
@@ -9,17 +9,20 @@ import {
   type CanvasPan,
   type CanvasPanDrag
 } from '../domain/canvas-pan';
+import { collectCanvasHighlights, type PreviewMode } from '../domain/preview-highlights';
 import { collectVisiblePreviewImageLayers, resolveLayerImagePath } from '../domain/preview-assets';
 import type { PSDUIProject } from '../schemas/psdui';
 
 interface CanvasPreviewProps {
   project: PSDUIProject | null;
+  selectedSourceLayerIds: number[];
   selectedExportNodeId: string | null;
   hiddenSourceLayerIds: number[];
 }
 
 export function CanvasPreview({
   project,
+  selectedSourceLayerIds,
   selectedExportNodeId,
   hiddenSourceLayerIds
 }: CanvasPreviewProps) {
@@ -27,11 +30,12 @@ export function CanvasPreview({
   const [fitZoom, setFitZoom] = useState(1);
   const [manualZoom, setManualZoom] = useState(1);
   const [zoomMode, setZoomMode] = useState<'fit' | 'manual'>('fit');
-  const [previewMode, setPreviewMode] = useState<'source' | 'export'>('source');
+  const [previewMode, setPreviewMode] = useState<PreviewMode>('source');
   const [pan, setPan] = useState<CanvasPan>({ x: 0, y: 0 });
   const [panDrag, setPanDrag] = useState<CanvasPanDrag | null>(null);
 
   const effectiveZoom = zoomMode === 'fit' ? fitZoom : manualZoom;
+  const selectedSourceLayerKey = selectedSourceLayerIds.join(',');
 
   useLayoutEffect(() => {
     if (project === null || shellRef.current === null) {
@@ -67,6 +71,18 @@ export function CanvasPreview({
     setPanDrag(null);
   }, [project]);
 
+  useLayoutEffect(() => {
+    if (selectedSourceLayerIds.length > 0) {
+      setPreviewMode('source');
+    }
+  }, [selectedSourceLayerIds.length, selectedSourceLayerKey]);
+
+  useLayoutEffect(() => {
+    if (selectedExportNodeId !== null) {
+      setPreviewMode('export');
+    }
+  }, [selectedExportNodeId]);
+
   if (project === null) {
     return (
       <section className="canvas-placeholder">
@@ -78,19 +94,20 @@ export function CanvasPreview({
 
   const documentWidth = Math.max(1, project.document.width);
   const documentHeight = Math.max(1, project.document.height);
-  const nodes = flattenExportNodes(project.exportTree);
   const exportedSourceLayerIds = collectExportedSourceLayerIds(project.exportTree);
-  const hiddenLayerIds = new Set(hiddenSourceLayerIds);
-  const visibleNodes = nodes.filter(
-    (node) =>
-      node.sourceLayerIds.length === 0
-      || node.sourceLayerIds.some((sourceLayerId) => !hiddenLayerIds.has(sourceLayerId))
-  );
   const imageLayers = collectVisiblePreviewImageLayers(
     project.sourceTree,
     hiddenSourceLayerIds,
     previewMode === 'source' ? null : exportedSourceLayerIds
   );
+  const highlights = collectCanvasHighlights({
+    mode: previewMode,
+    sourceTree: project.sourceTree,
+    exportTree: project.exportTree,
+    selectedSourceLayerIds,
+    selectedExportNodeId,
+    hiddenSourceLayerIds
+  });
   const zoomLabel = `${Math.round(effectiveZoom * 100)}%`;
 
   return (
@@ -238,25 +255,22 @@ export function CanvasPreview({
               />
             );
           })}
-          {(previewMode === 'source' ? [] : visibleNodes).map((node) => {
-            const isSelected = selectedExportNodeId === node.id;
-
+          {highlights.map((highlight) => {
             return (
-              <button
-                key={node.id}
-                type="button"
-                className={`canvas-node ${isSelected ? 'selected' : ''}`}
+              <div
+                key={highlight.id}
+                className={`canvas-highlight ${highlight.kind}`}
                 style={{
-                  left: `${(node.rect.x / documentWidth) * 100}%`,
-                  top: `${(node.rect.y / documentHeight) * 100}%`,
-                  width: `${(node.rect.width / documentWidth) * 100}%`,
-                  height: `${(node.rect.height / documentHeight) * 100}%`
+                  left: `${(highlight.rect.x / documentWidth) * 100}%`,
+                  top: `${(highlight.rect.y / documentHeight) * 100}%`,
+                  width: `${(highlight.rect.width / documentWidth) * 100}%`,
+                  height: `${(highlight.rect.height / documentHeight) * 100}%`
                 }}
-                title={`${node.name} (${node.exportKind})`}
-                aria-label={`${node.name} ${node.exportKind}`}
+                title={highlight.name}
+                aria-label={`${highlight.name} ${highlight.kind} preview highlight`}
               >
-                <span>{node.name}</span>
-              </button>
+                <span>{highlight.name}</span>
+              </div>
             );
           })}
         </div>
