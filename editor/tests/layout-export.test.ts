@@ -215,7 +215,7 @@ describe('createLayoutDocument', () => {
     expect(project.exportTree[2].scale9!.border.left).toBe(18);
   });
 
-  test('creates an export package with image asset copy instructions', () => {
+  test('creates a compact scale9 export package for sliced image assets', () => {
     const project = createRewardProject();
     project.sourceTree = [
       {
@@ -257,13 +257,19 @@ describe('createLayoutDocument', () => {
     expect(imageNode?.asset).toEqual({
       type: 'image',
       path: 'images/dialog-bg.png',
-      width: 240,
-      height: 120
+      width: 37,
+      height: 25,
+      sourceWidth: 240,
+      sourceHeight: 120,
+      scale9Packing: 'compact'
     });
     expect(exportPackage.assets).toEqual([
       {
         sourcePath: '/fixtures/.psdui-cache/layers/dialog-bg.png',
-        outputPath: 'images/dialog-bg.png'
+        outputPath: 'images/dialog-bg.png',
+        scale9Crop: {
+          border: { top: 12, right: 18, bottom: 12, left: 18 }
+        }
       }
     ]);
   });

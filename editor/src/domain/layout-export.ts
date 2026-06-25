@@ -6,6 +6,9 @@ import { resolveLayerImagePath } from './preview-assets';
 export interface LayoutExportAsset {
   sourcePath: string;
   outputPath: string;
+  scale9Crop?: {
+    border: Scale9Settings['border'];
+  };
 }
 
 export interface LayoutExportPackage {
@@ -164,13 +167,53 @@ function createImageAsset(node: ExportNode, context: LayoutExportContext): UIIma
   }
 
   const outputPath = allocateImageAssetPath(node, context.usedAssetPaths);
-  context.assets.push({ sourcePath, outputPath });
+  const compactScale9 = createCompactScale9Asset(node.scale9, sourceLayer.image);
+  context.assets.push({
+    sourcePath,
+    outputPath,
+    ...(compactScale9 === null ? {} : { scale9Crop: { border: compactScale9.border } })
+  });
 
   return {
     type: 'image',
     path: outputPath,
-    width: sourceLayer.image.width,
-    height: sourceLayer.image.height
+    width: compactScale9?.width ?? sourceLayer.image.width,
+    height: compactScale9?.height ?? sourceLayer.image.height,
+    ...(compactScale9 === null
+      ? {}
+      : {
+          sourceWidth: sourceLayer.image.width,
+          sourceHeight: sourceLayer.image.height,
+          scale9Packing: 'compact' as const
+        })
+  };
+}
+
+function createCompactScale9Asset(
+  scale9: Scale9Settings | null | undefined,
+  image: { width: number; height: number }
+): { width: number; height: number; border: Scale9Settings['border'] } | null {
+  if (scale9?.enabled !== true) {
+    return null;
+  }
+
+  const border = scale9.border;
+
+  if (
+    border.left < 0 ||
+    border.right < 0 ||
+    border.top < 0 ||
+    border.bottom < 0 ||
+    border.left + border.right >= image.width ||
+    border.top + border.bottom >= image.height
+  ) {
+    return null;
+  }
+
+  return {
+    width: border.left + 1 + border.right,
+    height: border.top + 1 + border.bottom,
+    border: { ...border }
   };
 }
 

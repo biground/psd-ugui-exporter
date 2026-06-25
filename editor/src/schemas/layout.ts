@@ -6,6 +6,9 @@ export interface UIImageAsset {
   path: string;
   width: number;
   height: number;
+  sourceWidth?: number;
+  sourceHeight?: number;
+  scale9Packing?: 'compact';
 }
 
 export interface UILayoutNode {
