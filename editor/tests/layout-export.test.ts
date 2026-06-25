@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { createLayoutDocument } from '../src/domain/layout-export';
+import { createLayoutDocument, createLayoutExportPackage } from '../src/domain/layout-export';
 import type { PSDUIProject } from '../src/schemas/psdui';
 
 function createRewardProject(): PSDUIProject {
@@ -213,6 +213,59 @@ describe('createLayoutDocument', () => {
     imageNode!.scale9!.border.left = 99;
 
     expect(project.exportTree[2].scale9!.border.left).toBe(18);
+  });
+
+  test('creates an export package with image asset copy instructions', () => {
+    const project = createRewardProject();
+    project.sourceTree = [
+      {
+        id: 6,
+        name: 'DialogBgSource',
+        kind: 'pixel',
+        visible: true,
+        opacity: 1,
+        blendMode: 'normal',
+        sourceBounds: { x: 20, y: 24, width: 240, height: 120 },
+        rasterBounds: { x: 20, y: 24, width: 240, height: 120 },
+        image: { path: 'layers/dialog-bg.png', width: 240, height: 120 },
+        text: null,
+        children: []
+      }
+    ];
+    project.exportTree.push({
+      id: 'dialog-bg',
+      name: 'DialogBg',
+      exportKind: 'image',
+      enabled: true,
+      sourceLayerIds: [6],
+      rect: { x: 20, y: 24, width: 240, height: 120 },
+      rasterBounds: { x: 20, y: 24, width: 240, height: 120 },
+      list: null,
+      scale9: {
+        enabled: true,
+        mode: 'sliced',
+        unit: 'pixel',
+        relativeTo: 'asset',
+        border: { left: 18, right: 18, top: 12, bottom: 12 }
+      },
+      children: []
+    });
+
+    const exportPackage = createLayoutExportPackage(project);
+    const imageNode = exportPackage.layout.nodes.find((node) => node.id === 'dialog-bg');
+
+    expect(imageNode?.asset).toEqual({
+      type: 'image',
+      path: 'images/dialog-bg.png',
+      width: 240,
+      height: 120
+    });
+    expect(exportPackage.assets).toEqual([
+      {
+        sourcePath: '/fixtures/.psdui-cache/layers/dialog-bg.png',
+        outputPath: 'images/dialog-bg.png'
+      }
+    ]);
   });
 
   test('exports text metadata for the first mapped source text layer', () => {

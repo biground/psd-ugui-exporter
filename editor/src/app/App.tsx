@@ -7,7 +7,7 @@ import { CanvasPreview } from '../components/CanvasPreview';
 import { ExportTree } from '../components/ExportTree';
 import { Inspector } from '../components/Inspector';
 import { SourceTree } from '../components/SourceTree';
-import { createLayoutDocument } from '../domain/layout-export';
+import { createLayoutExportPackage } from '../domain/layout-export';
 import { resolveLayerImagePath } from '../domain/preview-assets';
 import {
   defaultWorkspacePanelWidths,
@@ -303,8 +303,12 @@ export function App() {
         throw new Error('Set a ui.layout.json path before exporting.');
       }
 
-      const layout = createLayoutDocument(state.project);
-      await invoke('export_layout', { layoutPath: projectSettings.layoutPath, layout });
+      const exportPackage = createLayoutExportPackage(state.project);
+      await invoke('export_layout', {
+        layoutPath: projectSettings.layoutPath,
+        layout: exportPackage.layout,
+        assets: exportPackage.assets
+      });
       setState((current) => ({ ...current, message: `Exported ${projectSettings.layoutPath}.` }));
     });
   }

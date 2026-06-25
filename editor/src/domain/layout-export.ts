@@ -1,6 +1,24 @@
-import type { UILayoutDocument, UILayoutNode } from '../schemas/layout';
+import type { UILayoutDocument, UILayoutNode, UIImageAsset } from '../schemas/layout';
 import type { ExportNode, ListSettings, PSDUIProject, Scale9Settings } from '../schemas/psdui';
 import type { Rect, SourceLayer, SourceText } from '../schemas/source';
+import { resolveLayerImagePath } from './preview-assets';
+
+export interface LayoutExportAsset {
+  sourcePath: string;
+  outputPath: string;
+}
+
+export interface LayoutExportPackage {
+  layout: UILayoutDocument;
+  assets: LayoutExportAsset[];
+}
+
+interface LayoutExportContext {
+  cacheRoot: string;
+  sourceImages: Map<number, SourceLayer>;
+  usedAssetPaths: Set<string>;
+  assets: LayoutExportAsset[];
+}
 
 function copyRect(rect: Rect): Rect {
   return { ...rect };
@@ -46,6 +64,15 @@ function collectSourceTexts(layers: SourceLayer[], texts: Map<number, SourceText
   }
 }
 
+function collectSourceImages(layers: SourceLayer[], images: Map<number, SourceLayer>): void {
+  for (const layer of layers) {
+    if (layer.image !== null) {
+      images.set(layer.id, layer);
+    }
+    collectSourceImages(layer.children, images);
+  }
+}
+
 function resolveLayoutText(node: ExportNode, texts: Map<number, SourceText>): SourceText | null {
   for (const sourceLayerId of node.sourceLayerIds) {
     const text = texts.get(sourceLayerId);
@@ -56,10 +83,16 @@ function resolveLayoutText(node: ExportNode, texts: Map<number, SourceText>): So
   return null;
 }
 
-function createLayoutNode(node: ExportNode, texts: Map<number, SourceText>): UILayoutNode | null {
+function createLayoutNode(
+  node: ExportNode,
+  texts: Map<number, SourceText>,
+  context: LayoutExportContext
+): UILayoutNode | null {
   if (!node.enabled) {
     return null;
   }
+
+  const asset = createImageAsset(node, context);
 
   return {
     id: node.id,
@@ -68,26 +101,97 @@ function createLayoutNode(node: ExportNode, texts: Map<number, SourceText>): UIL
     rect: copyRect(node.rect),
     rasterBounds: node.rasterBounds === null ? null : copyRect(node.rasterBounds),
     sourceLayerIds: [...node.sourceLayerIds],
+    asset,
     text: resolveLayoutText(node, texts),
     list: copyListSettings(node.list),
     scale9: copyScale9Settings(node.scale9),
     children: node.children.flatMap((child) => {
-      const layoutChild = createLayoutNode(child, texts);
+      const layoutChild = createLayoutNode(child, texts, context);
       return layoutChild === null ? [] : [layoutChild];
     })
   };
 }
 
 export function createLayoutDocument(project: PSDUIProject): UILayoutDocument {
-  const texts = new Map<number, SourceText>();
-  collectSourceTexts(project.sourceTree, texts);
+  return createLayoutExportPackage(project).layout;
+}
 
-  return {
-    version: 1,
+export function createLayoutExportPackage(project: PSDUIProject): LayoutExportPackage {
+  const texts = new Map<number, SourceText>();
+  const sourceImages = new Map<number, SourceLayer>();
+  collectSourceTexts(project.sourceTree, texts);
+  collectSourceImages(project.sourceTree, sourceImages);
+
+  const context: LayoutExportContext = {
+    cacheRoot: project.cache.assetsDir,
+    sourceImages,
+    usedAssetPaths: new Set(),
+    assets: []
+  };
+
+  const layout = {
+    version: 1 as const,
     document: { ...project.document },
     nodes: project.exportTree.flatMap((child) => {
-      const layoutNode = createLayoutNode(child, texts);
+      const layoutNode = createLayoutNode(child, texts, context);
       return layoutNode === null ? [] : [layoutNode];
     })
   };
+
+  return {
+    layout,
+    assets: context.assets
+  };
+}
+
+function createImageAsset(node: ExportNode, context: LayoutExportContext): UIImageAsset | null {
+  if (node.exportKind !== 'image') {
+    return null;
+  }
+
+  const sourceLayer = node.sourceLayerIds
+    .map((sourceLayerId) => context.sourceImages.get(sourceLayerId))
+    .find((layer) => layer?.image !== null && layer?.image !== undefined);
+
+  if (sourceLayer?.image === null || sourceLayer?.image === undefined) {
+    return null;
+  }
+
+  const sourcePath = resolveLayerImagePath(sourceLayer, context.cacheRoot);
+
+  if (sourcePath === null) {
+    return null;
+  }
+
+  const outputPath = allocateImageAssetPath(node, context.usedAssetPaths);
+  context.assets.push({ sourcePath, outputPath });
+
+  return {
+    type: 'image',
+    path: outputPath,
+    width: sourceLayer.image.width,
+    height: sourceLayer.image.height
+  };
+}
+
+function allocateImageAssetPath(node: ExportNode, usedAssetPaths: Set<string>): string {
+  const baseName = sanitizeAssetFileName(node.name) || sanitizeAssetFileName(node.id) || 'image';
+  let candidate = `images/${baseName}.png`;
+  let suffix = 2;
+
+  while (usedAssetPaths.has(candidate)) {
+    candidate = `images/${baseName}-${suffix}.png`;
+    suffix += 1;
+  }
+
+  usedAssetPaths.add(candidate);
+  return candidate;
+}
+
+function sanitizeAssetFileName(value: string): string {
+  return value
+    .replace(/([a-z0-9])([A-Z])/g, '$1-$2')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
 }
