@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { createOpenPsdDialogOptions } from '../src/app/open-dialog';
+import { createOpenProjectDialogOptions, createOpenPsdDialogOptions } from '../src/app/open-dialog';
 
 describe('open PSD dialog options', () => {
   test('uses Documents as the default file picker path', () => {
@@ -19,5 +19,21 @@ describe('open PSD dialog options', () => {
         extensions: ['psd', 'psb']
       }
     ]);
+  });
+
+  test('opens a single psdui project file', () => {
+    const options = createOpenProjectDialogOptions('/Users/biground/Documents');
+
+    expect(options).toEqual({
+      title: 'Open PSDUI Project',
+      multiple: false,
+      defaultPath: '/Users/biground/Documents',
+      filters: [
+        {
+          name: 'PSDUI projects',
+          extensions: ['psdui']
+        }
+      ]
+    });
   });
 });

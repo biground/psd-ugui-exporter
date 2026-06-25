@@ -23,3 +23,17 @@ export function createOpenPsdDialogOptions(documentsPath: string): OpenPsdDialog
     ]
   };
 }
+
+export function createOpenProjectDialogOptions(documentsPath: string): OpenPsdDialogOptions {
+  return {
+    title: 'Open PSDUI Project',
+    multiple: false,
+    defaultPath: documentsPath,
+    filters: [
+      {
+        name: 'PSDUI projects',
+        extensions: ['psdui']
+      }
+    ]
+  };
+}

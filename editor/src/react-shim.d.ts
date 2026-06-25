@@ -17,6 +17,7 @@ declare module 'react' {
     current: T | null;
   }
 
+  export function useEffect(effect: () => void | (() => void), dependencies?: unknown[]): void;
   export function useLayoutEffect(effect: () => void | (() => void), dependencies?: unknown[]): void;
   export function useMemo<T>(factory: () => T, dependencies: unknown[]): T;
   export function useRef<T>(initialValue: T | null): RefObject<T>;

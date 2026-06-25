@@ -1,16 +1,23 @@
 import { invoke } from '@tauri-apps/api/core';
 import { documentDir } from '@tauri-apps/api/path';
 import { open } from '@tauri-apps/plugin-dialog';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { CanvasPreview } from '../components/CanvasPreview';
 import { ExportTree } from '../components/ExportTree';
 import { Inspector } from '../components/Inspector';
 import { SourceTree } from '../components/SourceTree';
 import { createLayoutDocument } from '../domain/layout-export';
-import type { ExportKind, ExportNode } from '../schemas/psdui';
-import { createOpenPsdDialogOptions } from './open-dialog';
+import type { ExportKind, ExportNode, PSDUIProject } from '../schemas/psdui';
+import { createOpenProjectDialogOptions, createOpenPsdDialogOptions } from './open-dialog';
 import { deriveDefaultProjectSettings, type ProjectSettings } from './project-settings';
+import {
+  createRecentFilesStore,
+  forgetRecentProject,
+  getRecentOpenCandidates,
+  recordRecentProject,
+  recordRecentSource
+} from './recent-files';
 import {
   addSourceLayerToExportTree,
   collectExportedSourceLayerIds,
@@ -33,6 +40,7 @@ type SelectChangeEvent = { target: HTMLSelectElement };
 type DetailsToggleEvent = { target: HTMLDetailsElement };
 
 export function App() {
+  const recentFilesStore = useMemo(() => createRecentFilesStore(window.localStorage), []);
   const [state, setState] = useState(createEmptyState);
   const [projectSettings, setProjectSettings] = useState<ProjectSettings>({
     projectPath: '',
@@ -57,6 +65,10 @@ export function App() {
     return collectExportedSourceLayerIds(state.project.exportTree);
   }, [state.project]);
 
+  useEffect(() => {
+    void restoreRecentFile();
+  }, []);
+
   async function runCommand(action: () => Promise<void>) {
     try {
       await action();
@@ -66,6 +78,59 @@ export function App() {
         message: error instanceof Error ? error.message : String(error)
       }));
     }
+  }
+
+  async function restoreRecentFile() {
+    const candidates = getRecentOpenCandidates(recentFilesStore.load());
+
+    if (candidates.length === 0) {
+      return;
+    }
+
+    setState((current) => ({
+      ...current,
+      message: 'Restoring last opened file...'
+    }));
+
+    let lastError: unknown = null;
+    let projectRestoreFailed = false;
+
+    for (const candidate of candidates) {
+      try {
+        if (candidate.kind === 'project') {
+          const project = await invoke<PSDUIProject>('read_project', {
+            projectPath: candidate.path
+          });
+
+          recordRecentProject(recentFilesStore, candidate.path, project.source.path);
+          openProjectInEditor(project, `Restored ${candidate.path}.`, candidate.path);
+          return;
+        }
+
+        const sourceDocument = await invoke<SourceDocumentInput>('open_psd', {
+          sourcePath: candidate.path,
+          cacheDir: null
+        });
+        const project = createProjectFromSourceDocument(sourceDocument);
+
+        if (projectRestoreFailed) {
+          forgetRecentProject(recentFilesStore);
+        }
+        recordRecentSource(recentFilesStore, candidate.path);
+        openProjectInEditor(project, `Restored ${project.source.fileName}.`);
+        return;
+      } catch (error) {
+        if (candidate.kind === 'project') {
+          projectRestoreFailed = true;
+        }
+        lastError = error;
+      }
+    }
+
+    setState((current) => ({
+      ...current,
+      message: `Could not restore recent file: ${formatError(lastError)}`
+    }));
   }
 
   async function openPsd() {
@@ -90,17 +155,49 @@ export function App() {
         cacheDir: null
       });
       const project = createProjectFromSourceDocument(sourceDocument);
-      setProjectSettings(deriveDefaultProjectSettings(project.source.path));
-      setProjectSettingsOpen(false);
+      recordRecentSource(recentFilesStore, sourcePath);
 
-      setState({
-        project,
-        selectedSourceLayerIds: [],
-        hiddenSourceLayerIds: [],
-        selectedExportNodeId: project.exportTree[0]?.id ?? null,
-        selectedExportNodeIds: [],
-        message: `Opened ${project.source.fileName}.`
-      });
+      openProjectInEditor(project, `Opened ${project.source.fileName}.`);
+    });
+  }
+
+  async function openProject() {
+    await runCommand(async () => {
+      const selectedPath = await open(createOpenProjectDialogOptions(await documentDir()));
+
+      if (selectedPath === null) {
+        setState((current) => ({
+          ...current,
+          message: 'Open cancelled.'
+        }));
+        return;
+      }
+
+      const projectPath = Array.isArray(selectedPath) ? selectedPath[0] : selectedPath;
+      if (projectPath === undefined) {
+        throw new Error('No PSDUI project file was selected.');
+      }
+
+      const project = await invoke<PSDUIProject>('read_project', { projectPath });
+      recordRecentProject(recentFilesStore, projectPath, project.source.path);
+      openProjectInEditor(project, `Opened ${projectPath}.`, projectPath);
+    });
+  }
+
+  function openProjectInEditor(project: PSDUIProject, message: string, projectPath?: string) {
+    setProjectSettings({
+      ...deriveDefaultProjectSettings(project.source.path),
+      ...(projectPath === undefined ? {} : { projectPath })
+    });
+    setProjectSettingsOpen(false);
+
+    setState({
+      project,
+      selectedSourceLayerIds: [],
+      hiddenSourceLayerIds: [],
+      selectedExportNodeId: project.exportTree[0]?.id ?? null,
+      selectedExportNodeIds: [],
+      message
     });
   }
 
@@ -123,8 +220,10 @@ export function App() {
         throw new Error('Set a .psdui project path before saving.');
       }
 
-      await invoke('save_project', { projectPath: projectSettings.projectPath, project: state.project });
-      setState((current) => ({ ...current, message: `Saved ${projectSettings.projectPath}.` }));
+      const projectPath = projectSettings.projectPath.trim();
+      await invoke('save_project', { projectPath, project: state.project });
+      recordRecentProject(recentFilesStore, projectPath, state.project.source.path);
+      setState((current) => ({ ...current, message: `Saved ${projectPath}.` }));
     });
   }
 
@@ -182,6 +281,9 @@ export function App() {
             <button type="button" className="open-file-hero" onClick={openPsd}>
               Open PSD/PSB
             </button>
+            <button type="button" onClick={openProject}>
+              Open .psdui
+            </button>
             <p className="message" role="status">
               {state.message ?? 'Choose a Photoshop document to begin.'}
             </p>
@@ -197,6 +299,9 @@ export function App() {
               <div className="actions">
                 <button type="button" onClick={openPsd}>
                   Open Another
+                </button>
+                <button type="button" onClick={openProject}>
+                  Open .psdui
                 </button>
                 <label className="compact-select">
                   <span>Merge as</span>
@@ -299,6 +404,10 @@ export function App() {
       </main>
     </>
   );
+}
+
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 interface PathInputProps {

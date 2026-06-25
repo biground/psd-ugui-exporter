@@ -7,6 +7,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .invoke_handler(tauri::generate_handler![
             commands::open_psd,
+            commands::read_project,
             commands::save_project,
             commands::export_layout,
         ])

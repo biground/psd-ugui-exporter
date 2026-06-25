@@ -5,9 +5,15 @@ use serde::Serialize;
 use serde_json::Value;
 
 pub fn write_json_file(path: &Path, value: &impl Serialize) -> Result<(), String> {
-    if let Some(parent) = path.parent().filter(|parent| !parent.as_os_str().is_empty()) {
+    if let Some(parent) = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
         fs::create_dir_all(parent).map_err(|error| {
-            format!("Failed to create parent directory {}: {error}", parent.display())
+            format!(
+                "Failed to create parent directory {}: {error}",
+                parent.display()
+            )
         })?;
     }
 
