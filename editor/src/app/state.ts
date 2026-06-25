@@ -616,7 +616,7 @@ function cloneExportNode(node: ExportNode): ExportNode {
 
 function inferExportKind(sourceLayer: SourceLayer | undefined): ExportKind {
   if (sourceLayer?.kind === 'group') {
-    return 'VGLayout';
+    return 'Node';
   }
 
   if (sourceLayer?.text !== null && sourceLayer?.text !== undefined) {

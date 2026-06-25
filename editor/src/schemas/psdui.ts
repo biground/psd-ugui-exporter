@@ -1,6 +1,6 @@
 import type { Rect, SourceLayer } from './source';
 
-export const exportKinds = ['image', 'text', 'button', 'list', 'VGLayout', 'HGLayout', 'Item'] as const;
+export const exportKinds = ['Node', 'image', 'text', 'button', 'list', 'VGLayout', 'HGLayout', 'Item'] as const;
 
 export type ExportKind = typeof exportKinds[number];
 

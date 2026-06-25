@@ -5,8 +5,17 @@ import inspector from '../src/components/Inspector.tsx?raw';
 import { exportKinds } from '../src/schemas/psdui';
 
 describe('export kind options', () => {
-  test('removes group and exposes layout/item export semantics', () => {
-    expect(exportKinds).toEqual(['image', 'text', 'button', 'list', 'VGLayout', 'HGLayout', 'Item']);
+  test('removes group and exposes node/layout/item export semantics', () => {
+    expect(exportKinds).toEqual([
+      'Node',
+      'image',
+      'text',
+      'button',
+      'list',
+      'VGLayout',
+      'HGLayout',
+      'Item'
+    ]);
     expect(exportKinds).not.toContain('group');
   });
 
