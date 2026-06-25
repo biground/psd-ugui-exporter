@@ -2,6 +2,7 @@ import { describe, expect, test } from 'vitest';
 
 import {
   resolvePreviewTextAlign,
+  resolvePreviewTextLineHeight,
   resolvePreviewTextStroke,
   resolvePreviewTextVerticalJustify
 } from '../src/domain/preview-text-rendering';
@@ -21,6 +22,27 @@ describe('preview text rendering', () => {
 
     expect(resolvePreviewTextAlign(text)).toBe('center');
     expect(resolvePreviewTextVerticalJustify(text)).toBe('center');
+  });
+
+  test('centers point text vertically when PSD has no paragraph vertical alignment', () => {
+    const text: SourceText = {
+      value: '999',
+      fontSize: 40,
+      box: {
+        kind: 'point',
+        bounds: { x: 280, y: 86, width: 80, height: 42 },
+        width: 80,
+        height: 42,
+        wrap: false
+      },
+      paragraph: {
+        horizontalAlign: { value: 2, name: 'center' },
+        verticalAlign: { value: null, name: 'unknown' }
+      }
+    };
+
+    expect(resolvePreviewTextVerticalJustify(text)).toBe('center');
+    expect(resolvePreviewTextLineHeight(text, 1)).toBe(1);
   });
 
   test('creates CSS text stroke from PSD stroke metadata', () => {

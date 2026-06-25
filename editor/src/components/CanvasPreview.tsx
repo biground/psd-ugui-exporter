@@ -23,6 +23,7 @@ import {
 } from '../domain/preview-text-style';
 import {
   resolvePreviewTextAlign,
+  resolvePreviewTextLineHeight,
   resolvePreviewTextStroke,
   resolvePreviewTextVerticalJustify
 } from '../domain/preview-text-rendering';
@@ -290,7 +291,7 @@ export function CanvasPreview({
             const text = layer.text;
             const textRect = resolveTextRect(layer);
             const fontSize = resolveTextFontSize(text, textRect.height, effectiveZoom);
-            const lineHeight = resolveTextLineHeight(text, effectiveZoom);
+            const lineHeight = resolvePreviewTextLineHeight(text, effectiveZoom);
             const wrapsText = shouldWrapText(text);
 
             return (
@@ -352,14 +353,6 @@ function resolveTextFontSize(text: SourceText | null, boundsHeight: number, zoom
     : Math.max(10, boundsHeight * 0.7);
 
   return Math.max(1, Math.round(size * zoom * 100) / 100);
-}
-
-function resolveTextLineHeight(text: SourceText | null, zoom: number): number | string {
-  if (typeof text?.lineHeight === 'number' && text.lineHeight > 0) {
-    return `${Math.round(text.lineHeight * zoom * 100) / 100}px`;
-  }
-
-  return 1.1;
 }
 
 function resolveTextColor(text: SourceText | null): string {

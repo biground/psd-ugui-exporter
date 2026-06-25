@@ -2,6 +2,7 @@ import type { SourceText } from '../schemas/source';
 
 export type PreviewTextAlign = 'left' | 'right' | 'center' | 'justify';
 export type PreviewTextVerticalJustify = 'flex-start' | 'center' | 'flex-end';
+export type PreviewTextLineHeight = number | string;
 
 export interface PreviewTextStrokeStyle {
   WebkitTextStroke?: string;
@@ -31,7 +32,26 @@ export function resolvePreviewTextVerticalJustify(
     return 'flex-end';
   }
 
+  if (isPointLikeText(text)) {
+    return 'center';
+  }
+
   return 'flex-start';
+}
+
+export function resolvePreviewTextLineHeight(
+  text: SourceText | null,
+  zoom: number
+): PreviewTextLineHeight {
+  if (isPointLikeText(text)) {
+    return 1;
+  }
+
+  if (typeof text?.lineHeight === 'number' && text.lineHeight > 0) {
+    return `${Math.round(text.lineHeight * zoom * 100) / 100}px`;
+  }
+
+  return 1.1;
 }
 
 export function resolvePreviewTextStroke(
@@ -56,6 +76,14 @@ export function resolvePreviewTextStroke(
     WebkitTextStroke: `${size}px ${color}`,
     paintOrder: 'stroke fill'
   };
+}
+
+function isPointLikeText(text: SourceText | null): boolean {
+  if (text === null) {
+    return false;
+  }
+
+  return text.box?.kind !== 'paragraph' && text.box?.wrap !== true;
 }
 
 function readHexColor(color: unknown): string | null {
