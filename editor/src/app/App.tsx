@@ -8,6 +8,12 @@ import { ExportTree } from '../components/ExportTree';
 import { Inspector } from '../components/Inspector';
 import { SourceTree } from '../components/SourceTree';
 import { createLayoutDocument } from '../domain/layout-export';
+import {
+  defaultTreePanelWidths,
+  resizeTreePanelsFromPointer,
+  treePanelMinWidth,
+  type TreePanelWidths
+} from '../domain/tree-panel-resize';
 import type { ExportKind, ExportNode, PSDUIProject } from '../schemas/psdui';
 import { createOpenProjectDialogOptions, createOpenPsdDialogOptions } from './open-dialog';
 import { deriveDefaultProjectSettings, type ProjectSettings } from './project-settings';
@@ -38,6 +44,16 @@ import {
 type InputChangeEvent = { target: HTMLInputElement };
 type SelectChangeEvent = { target: HTMLSelectElement };
 type DetailsToggleEvent = { target: HTMLDetailsElement };
+type TreePanelResizePointerEvent = {
+  clientX: number;
+  pointerId: number;
+  preventDefault: () => void;
+  currentTarget: {
+    parentElement: { getBoundingClientRect: () => { left: number } } | null;
+    setPointerCapture: (pointerId: number) => void;
+    releasePointerCapture: (pointerId: number) => void;
+  };
+};
 
 export function App() {
   const recentFilesStore = useMemo(() => createRecentFilesStore(window.localStorage), []);
@@ -48,6 +64,8 @@ export function App() {
   });
   const [projectSettingsOpen, setProjectSettingsOpen] = useState(false);
   const [newExportKind, setNewExportKind] = useState<ExportKind>('image');
+  const [treePanelWidths, setTreePanelWidths] = useState<TreePanelWidths>(defaultTreePanelWidths);
+  const [isTreePanelResizing, setTreePanelResizing] = useState(false);
 
   const selectedExportNode = useMemo(() => {
     if (state.project === null) {
@@ -346,7 +364,13 @@ export function App() {
                 {state.message ?? 'Ready.'}
               </p>
             </header>
-            <section className="workspace">
+            <section
+              className="workspace"
+              style={{
+                '--source-tree-panel-width': `${treePanelWidths.sourceWidth}px`,
+                '--export-tree-panel-width': `${treePanelWidths.exportWidth}px`
+              }}
+            >
               <aside className="tree-panel source-panel">
                 <section className="panel-section">
                   <h2>Source Tree</h2>
@@ -365,6 +389,48 @@ export function App() {
                   />
                 </section>
               </aside>
+              <div
+                className={`tree-panel-resizer ${isTreePanelResizing ? 'resizing' : ''}`}
+                role="separator"
+                aria-label="Resize Source Tree and Export Tree panels"
+                aria-orientation="vertical"
+                aria-valuemin={treePanelMinWidth}
+                aria-valuemax={
+                  treePanelWidths.sourceWidth + treePanelWidths.exportWidth - treePanelMinWidth
+                }
+                aria-valuenow={treePanelWidths.sourceWidth}
+                title="Resize Source Tree and Export Tree panels"
+                onPointerDown={(event: TreePanelResizePointerEvent) => {
+                  event.preventDefault();
+                  event.currentTarget.setPointerCapture(event.pointerId);
+                  setTreePanelResizing(true);
+                }}
+                onPointerMove={(event: TreePanelResizePointerEvent) => {
+                  if (!isTreePanelResizing || event.currentTarget.parentElement === null) {
+                    return;
+                  }
+
+                  event.preventDefault();
+                  const bounds = event.currentTarget.parentElement.getBoundingClientRect();
+                  setTreePanelWidths((current) =>
+                    resizeTreePanelsFromPointer({
+                      containerLeft: bounds.left,
+                      pointerX: event.clientX,
+                      totalWidth: current.sourceWidth + current.exportWidth
+                    })
+                  );
+                }}
+                onPointerUp={(event: TreePanelResizePointerEvent) => {
+                  if (!isTreePanelResizing) {
+                    return;
+                  }
+
+                  event.preventDefault();
+                  event.currentTarget.releasePointerCapture(event.pointerId);
+                  setTreePanelResizing(false);
+                }}
+                onPointerCancel={() => setTreePanelResizing(false)}
+              />
               <aside className="tree-panel export-panel">
                 <section className="panel-section">
                   <h2>Export Tree</h2>
@@ -622,7 +688,12 @@ button:disabled {
 
 .workspace {
   display: grid;
-  grid-template-columns: minmax(220px, 280px) minmax(220px, 280px) minmax(360px, 1fr) minmax(260px, 320px);
+  grid-template-columns:
+    var(--source-tree-panel-width, 280px)
+    8px
+    var(--export-tree-panel-width, 280px)
+    minmax(360px, 1fr)
+    minmax(260px, 320px);
   min-height: 0;
   overflow: hidden;
 }
@@ -636,6 +707,34 @@ button:disabled {
 
 .tree-panel {
   border-right: 1px solid #d8dee8;
+}
+
+.tree-panel-resizer {
+  position: relative;
+  z-index: 2;
+  min-height: 0;
+  border-right: 1px solid #d8dee8;
+  border-left: 1px solid #eef2f7;
+  background: #eef4fb;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.tree-panel-resizer::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2px;
+  height: 44px;
+  border-radius: 999px;
+  background: #9aa8ba;
+  transform: translate(-50%, -50%);
+}
+
+.tree-panel-resizer:hover,
+.tree-panel-resizer.resizing {
+  background: #dcecff;
 }
 
 .right-panel {
@@ -1077,6 +1176,10 @@ h2 {
 
   .workspace {
     grid-template-columns: 1fr;
+  }
+
+  .tree-panel-resizer {
+    display: none;
   }
 
   .tree-panel,
