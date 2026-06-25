@@ -178,6 +178,43 @@ describe('createLayoutDocument', () => {
     expect(project.exportTree[0].rect.x).toBe(12);
   });
 
+  test('exports engine-neutral scale9 metadata for image nodes', () => {
+    const project = createRewardProject();
+    project.exportTree.push({
+      id: 'dialog-bg',
+      name: 'DialogBg',
+      exportKind: 'image',
+      enabled: true,
+      sourceLayerIds: [6],
+      rect: { x: 20, y: 24, width: 240, height: 120 },
+      rasterBounds: { x: 20, y: 24, width: 240, height: 120 },
+      list: null,
+      scale9: {
+        enabled: true,
+        mode: 'sliced',
+        unit: 'pixel',
+        relativeTo: 'asset',
+        border: { left: 18, right: 18, top: 12, bottom: 12 }
+      },
+      children: []
+    });
+
+    const layout = createLayoutDocument(project);
+    const imageNode = layout.nodes.find((node) => node.id === 'dialog-bg');
+
+    expect(imageNode?.scale9).toEqual({
+      enabled: true,
+      mode: 'sliced',
+      unit: 'pixel',
+      relativeTo: 'asset',
+      border: { left: 18, right: 18, top: 12, bottom: 12 }
+    });
+
+    imageNode!.scale9!.border.left = 99;
+
+    expect(project.exportTree[2].scale9!.border.left).toBe(18);
+  });
+
   test('exports text metadata for the first mapped source text layer', () => {
     const project = createTextProject();
 

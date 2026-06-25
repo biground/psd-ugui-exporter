@@ -16,6 +16,19 @@ export interface ListSettings {
   };
 }
 
+export interface Scale9Settings {
+  enabled: boolean;
+  mode: 'sliced';
+  unit: 'pixel';
+  relativeTo: 'asset';
+  border: {
+    top: number;
+    right: number;
+    bottom: number;
+    left: number;
+  };
+}
+
 export interface ExportNode {
   id: string;
   name: string;
@@ -25,6 +38,7 @@ export interface ExportNode {
   rect: Rect;
   rasterBounds: Rect | null;
   list: ListSettings | null;
+  scale9?: Scale9Settings | null;
   children: ExportNode[];
   mergedFrom?: ExportNode[];
 }

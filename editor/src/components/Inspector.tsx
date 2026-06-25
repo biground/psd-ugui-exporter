@@ -1,11 +1,27 @@
-import { exportKinds, type ExportKind, type ExportNode, type ListSettings } from '../schemas/psdui';
+import { convertFileSrc } from '@tauri-apps/api/core';
+
+import {
+  exportKinds,
+  type ExportKind,
+  type ExportNode,
+  type ListSettings,
+  type Scale9Settings
+} from '../schemas/psdui';
+import { createAutoScale9Settings, createDefaultScale9Settings } from '../domain/scale9';
 
 interface InspectorProps {
   node: ExportNode | null;
   selectedExportNodeCount: number;
+  scale9PreviewAsset: Scale9PreviewAsset | null;
   onUpdateNode: (patch: Partial<ExportNode> | ((node: ExportNode) => ExportNode)) => void;
   onMergeSelectedExports: () => void;
   onUnmergeNode: (nodeId: string) => void;
+}
+
+interface Scale9PreviewAsset {
+  path: string;
+  width: number;
+  height: number;
 }
 
 type InputChangeEvent = { target: HTMLInputElement };
@@ -14,6 +30,7 @@ type SelectChangeEvent = { target: HTMLSelectElement };
 export function Inspector({
   node,
   selectedExportNodeCount,
+  scale9PreviewAsset,
   onUpdateNode,
   onMergeSelectedExports,
   onUnmergeNode
@@ -77,6 +94,13 @@ export function Inspector({
       ) : null}
       {node.exportKind === 'list' && node.list !== null ? (
         <ListSettingsEditor list={node.list} onUpdateNode={onUpdateNode} />
+      ) : null}
+      {node.exportKind === 'image' ? (
+        <Scale9SettingsEditor
+          node={node}
+          previewAsset={scale9PreviewAsset}
+          onUpdateNode={onUpdateNode}
+        />
       ) : null}
     </section>
   );
@@ -182,4 +206,131 @@ function ListSettingsEditor({ list, onUpdateNode }: ListSettingsEditorProps) {
       </div>
     </fieldset>
   );
+}
+
+interface Scale9SettingsEditorProps {
+  node: ExportNode;
+  previewAsset: Scale9PreviewAsset | null;
+  onUpdateNode: InspectorProps['onUpdateNode'];
+}
+
+function Scale9SettingsEditor({ node, previewAsset, onUpdateNode }: Scale9SettingsEditorProps) {
+  const scale9 = node.scale9 ?? null;
+  const assetSize = resolveScale9AssetSize(node, previewAsset);
+
+  function updateScale9(scale9Settings: Scale9Settings | null) {
+    onUpdateNode({ scale9: scale9Settings });
+  }
+
+  function updateBorder(side: keyof Scale9Settings['border'], value: number) {
+    if (scale9 === null) {
+      return;
+    }
+
+    updateScale9({
+      ...scale9,
+      border: {
+        ...scale9.border,
+        [side]: normalizeScale9BorderInput(value)
+      }
+    });
+  }
+
+  return (
+    <fieldset className="scale9-settings">
+      <legend>Scale9</legend>
+      <label className="checkbox-field">
+        <input
+          type="checkbox"
+          checked={scale9?.enabled === true}
+          onChange={(event: InputChangeEvent) =>
+            updateScale9(event.target.checked ? createDefaultScale9Settings() : null)
+          }
+        />
+        <span>九宫格图片</span>
+      </label>
+      {scale9 !== null && scale9.enabled ? (
+        <>
+          <div className="scale9-toolbar">
+            <button type="button" onClick={() => updateScale9(createAutoScale9Settings(assetSize))}>
+              Auto
+            </button>
+            <button type="button" onClick={() => updateScale9(createDefaultScale9Settings())}>
+              Reset
+            </button>
+          </div>
+          <Scale9Preview scale9={scale9} previewAsset={previewAsset} assetSize={assetSize} />
+          <div className="padding-grid" aria-label="Scale9 border">
+            {(['top', 'right', 'bottom', 'left'] as const).map((side) => (
+              <label key={side} className="field">
+                <span>{side}</span>
+                <input
+                  type="number"
+                  min="0"
+                  value={scale9.border[side]}
+                  onChange={(event: InputChangeEvent) => updateBorder(side, event.target.valueAsNumber || 0)}
+                />
+              </label>
+            ))}
+          </div>
+        </>
+      ) : null}
+    </fieldset>
+  );
+}
+
+interface Scale9PreviewProps {
+  scale9: Scale9Settings;
+  previewAsset: Scale9PreviewAsset | null;
+  assetSize: Scale9PreviewAsset;
+}
+
+function Scale9Preview({ scale9, previewAsset, assetSize }: Scale9PreviewProps) {
+  const left = toPercent(scale9.border.left, assetSize.width);
+  const right = 100 - toPercent(scale9.border.right, assetSize.width);
+  const top = toPercent(scale9.border.top, assetSize.height);
+  const bottom = 100 - toPercent(scale9.border.bottom, assetSize.height);
+
+  return (
+    <div
+      className="scale9-preview"
+      aria-label="Scale9 preview"
+      style={{ aspectRatio: `${assetSize.width} / ${assetSize.height}` }}
+    >
+      {previewAsset === null ? (
+        <span className="scale9-preview-placeholder">No image preview</span>
+      ) : (
+        <img src={convertFileSrc(previewAsset.path)} alt="" draggable={false} />
+      )}
+      <span className="scale9-guide vertical" style={{ left: `${left}%` }} aria-hidden="true" />
+      <span className="scale9-guide vertical" style={{ left: `${right}%` }} aria-hidden="true" />
+      <span className="scale9-guide horizontal" style={{ top: `${top}%` }} aria-hidden="true" />
+      <span className="scale9-guide horizontal" style={{ top: `${bottom}%` }} aria-hidden="true" />
+    </div>
+  );
+}
+
+function resolveScale9AssetSize(node: ExportNode, previewAsset: Scale9PreviewAsset | null): Scale9PreviewAsset {
+  if (previewAsset !== null) {
+    return {
+      ...previewAsset,
+      width: Math.max(1, previewAsset.width),
+      height: Math.max(1, previewAsset.height)
+    };
+  }
+
+  const rect = node.rasterBounds ?? node.rect;
+  return {
+    path: '',
+    width: Math.max(1, rect.width),
+    height: Math.max(1, rect.height)
+  };
+}
+
+function normalizeScale9BorderInput(value: number): number {
+  return Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0;
+}
+
+function toPercent(value: number, total: number): number {
+  return Math.max(0, Math.min(100, (value / Math.max(1, total)) * 100));
 }

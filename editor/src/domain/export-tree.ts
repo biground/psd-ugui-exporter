@@ -41,6 +41,7 @@ export function createExportNodeFromSources({
     rasterBounds:
       imageLayers.length > 0 ? unionRects(imageLayers.map((layer) => layer.rasterBounds)) : null,
     list: exportKind === 'list' ? createDefaultListSettings() : null,
+    scale9: null,
     children: []
   };
 }

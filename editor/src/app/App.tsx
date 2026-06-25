@@ -8,6 +8,7 @@ import { ExportTree } from '../components/ExportTree';
 import { Inspector } from '../components/Inspector';
 import { SourceTree } from '../components/SourceTree';
 import { createLayoutDocument } from '../domain/layout-export';
+import { resolveLayerImagePath } from '../domain/preview-assets';
 import {
   defaultWorkspacePanelWidths,
   defaultTreePanelWidths,
@@ -35,6 +36,7 @@ import {
   createEmptyState,
   createProjectFromSourceDocument,
   findExportNodeById,
+  findSourceLayersByIds,
   mergeSelectedExportNodes,
   moveExportNodeToDropTarget,
   removeExportNode,
@@ -94,6 +96,33 @@ export function App() {
 
     return findExportNodeById(state.project.exportTree, state.selectedExportNodeId);
   }, [state.project, state.selectedExportNodeId]);
+
+  const selectedScale9PreviewAsset = useMemo(() => {
+    if (state.project === null || selectedExportNode === null) {
+      return null;
+    }
+
+    const imageLayer = findSourceLayersByIds(
+      state.project.sourceTree,
+      selectedExportNode.sourceLayerIds
+    ).find((layer) => layer.image !== null);
+
+    if (imageLayer?.image === null || imageLayer?.image === undefined) {
+      return null;
+    }
+
+    const path = resolveLayerImagePath(imageLayer, state.project.cache.assetsDir);
+
+    if (path === null) {
+      return null;
+    }
+
+    return {
+      path,
+      width: imageLayer.image.width,
+      height: imageLayer.image.height
+    };
+  }, [selectedExportNode, state.project]);
 
   const exportedSourceLayerIds = useMemo(() => {
     if (state.project === null) {
@@ -556,6 +585,7 @@ export function App() {
                 <Inspector
                   node={selectedExportNode}
                   selectedExportNodeCount={state.selectedExportNodeIds.length}
+                  scale9PreviewAsset={selectedScale9PreviewAsset}
                   onUpdateNode={updateSelectedExportNode}
                   onMergeSelectedExports={mergeSelectedExportNodesFromTree}
                   onUnmergeNode={unmergeSelectedExportNode}
@@ -1289,7 +1319,8 @@ h2 {
   color: #b42318;
 }
 
-.list-settings {
+.list-settings,
+.scale9-settings {
   display: grid;
   gap: 12px;
   margin: 4px 0 0;
@@ -1298,10 +1329,65 @@ h2 {
   border-radius: 6px;
 }
 
-.list-settings legend {
+.list-settings legend,
+.scale9-settings legend {
   color: #526173;
   font-size: 12px;
   font-weight: 700;
+}
+
+.scale9-toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.scale9-preview {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  min-height: 96px;
+  overflow: hidden;
+  border: 1px solid #cbd3df;
+  border-radius: 6px;
+  background:
+    linear-gradient(45deg, #eef2f7 25%, transparent 25%),
+    linear-gradient(-45deg, #eef2f7 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #eef2f7 75%),
+    linear-gradient(-45deg, transparent 75%, #eef2f7 75%);
+  background-color: #ffffff;
+  background-position: 0 0, 0 6px, 6px -6px, -6px 0;
+  background-size: 12px 12px;
+}
+
+.scale9-preview img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+
+.scale9-preview-placeholder {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.scale9-guide {
+  position: absolute;
+  pointer-events: none;
+  background: #dc2626;
+}
+
+.scale9-guide.vertical {
+  top: 0;
+  bottom: 0;
+  width: 1px;
+}
+
+.scale9-guide.horizontal {
+  left: 0;
+  right: 0;
+  height: 1px;
 }
 
 .padding-grid {

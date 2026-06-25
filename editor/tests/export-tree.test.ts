@@ -56,6 +56,7 @@ describe('createExportNodeFromSources', () => {
       sourceLayerIds: [1, 2],
       rect: { x: 10, y: 20, width: 80, height: 30 },
       rasterBounds: { x: 12, y: 22, width: 76, height: 26 },
+      scale9: null,
       list: null,
       children: []
     });

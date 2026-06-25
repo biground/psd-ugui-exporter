@@ -545,6 +545,7 @@ function createExportNodeFromExportNodes(
     rect: unionRects(flattenedNodes.map((node) => node.rect)),
     rasterBounds: rasterBounds.length > 0 ? unionRects(rasterBounds) : null,
     list: null,
+    scale9: null,
     children: [],
     mergedFrom: exportNodes.map(cloneExportNode)
   });
@@ -560,6 +561,12 @@ function cloneExportNode(node: ExportNode): ExportNode {
       : {
           ...node.list,
           padding: { ...node.list.padding }
+        },
+    scale9: node.scale9 === null || node.scale9 === undefined
+      ? null
+      : {
+          ...node.scale9,
+          border: { ...node.scale9.border }
         },
     children: node.children.map(cloneExportNode),
     mergedFrom: node.mergedFrom?.map(cloneExportNode)
@@ -589,13 +596,15 @@ function normalizeExportNode(node: ExportNode): ExportNode {
   if (node.exportKind === 'list') {
     return {
       ...node,
-      list: node.list ?? createDefaultListSettings()
+      list: node.list ?? createDefaultListSettings(),
+      scale9: null
     };
   }
 
   return {
     ...node,
-    list: null
+    list: null,
+    scale9: node.exportKind === 'image' ? node.scale9 ?? null : null
   };
 }
 

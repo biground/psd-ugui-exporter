@@ -1,4 +1,4 @@
-import type { ExportKind, ListSettings } from './psdui';
+import type { ExportKind, ListSettings, Scale9Settings } from './psdui';
 import type { Rect, SourceText } from './source';
 
 export interface UILayoutNode {
@@ -10,6 +10,7 @@ export interface UILayoutNode {
   sourceLayerIds: number[];
   text: SourceText | null;
   list: ListSettings | null;
+  scale9: Scale9Settings | null;
   children: UILayoutNode[];
 }
 

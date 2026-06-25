@@ -1,5 +1,5 @@
 import type { UILayoutDocument, UILayoutNode } from '../schemas/layout';
-import type { ExportNode, ListSettings, PSDUIProject } from '../schemas/psdui';
+import type { ExportNode, ListSettings, PSDUIProject, Scale9Settings } from '../schemas/psdui';
 import type { Rect, SourceLayer, SourceText } from '../schemas/source';
 
 function copyRect(rect: Rect): Rect {
@@ -16,6 +16,20 @@ function copyListSettings(list: ListSettings | null): ListSettings | null {
     cellTemplateNodeId: list.cellTemplateNodeId,
     spacing: list.spacing,
     padding: { ...list.padding }
+  };
+}
+
+function copyScale9Settings(scale9: Scale9Settings | null | undefined): Scale9Settings | null {
+  if (scale9 === null || scale9 === undefined) {
+    return null;
+  }
+
+  return {
+    enabled: scale9.enabled,
+    mode: scale9.mode,
+    unit: scale9.unit,
+    relativeTo: scale9.relativeTo,
+    border: { ...scale9.border }
   };
 }
 
@@ -56,6 +70,7 @@ function createLayoutNode(node: ExportNode, texts: Map<number, SourceText>): UIL
     sourceLayerIds: [...node.sourceLayerIds],
     text: resolveLayoutText(node, texts),
     list: copyListSettings(node.list),
+    scale9: copyScale9Settings(node.scale9),
     children: node.children.flatMap((child) => {
       const layoutChild = createLayoutNode(child, texts);
       return layoutChild === null ? [] : [layoutChild];
