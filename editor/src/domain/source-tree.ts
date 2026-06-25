@@ -28,7 +28,7 @@ function createDefaultExportNode(layer: SourceLayer): ExportNode | null {
 
 function inferExportKind(layer: SourceLayer): ExportKind {
   if (layer.kind === 'group') {
-    return 'group';
+    return 'VGLayout';
   }
 
   if (layer.text) {

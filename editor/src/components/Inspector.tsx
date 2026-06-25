@@ -1,4 +1,4 @@
-import type { ExportKind, ExportNode, ListSettings } from '../schemas/psdui';
+import { exportKinds, type ExportKind, type ExportNode, type ListSettings } from '../schemas/psdui';
 
 interface InspectorProps {
   node: ExportNode | null;
@@ -7,8 +7,6 @@ interface InspectorProps {
   onMergeSelectedExports: () => void;
   onUnmergeNode: (nodeId: string) => void;
 }
-
-const exportKinds: ExportKind[] = ['group', 'image', 'text', 'button', 'list'];
 
 type InputChangeEvent = { target: HTMLInputElement };
 type SelectChangeEvent = { target: HTMLSelectElement };

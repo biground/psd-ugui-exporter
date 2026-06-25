@@ -14,7 +14,7 @@ import {
   treePanelMinWidth,
   type TreePanelWidths
 } from '../domain/tree-panel-resize';
-import type { ExportKind, ExportNode, PSDUIProject } from '../schemas/psdui';
+import { exportKinds, type ExportKind, type ExportNode, type PSDUIProject } from '../schemas/psdui';
 import { createOpenProjectDialogOptions, createOpenPsdDialogOptions } from './open-dialog';
 import { deriveDefaultProjectSettings, type ProjectSettings } from './project-settings';
 import {
@@ -324,11 +324,11 @@ export function App() {
                 <label className="compact-select">
                   <span>Merge as</span>
                   <select value={newExportKind} onChange={(event: SelectChangeEvent) => setNewExportKind(event.target.value as ExportKind)}>
-                    <option value="image">image</option>
-                    <option value="button">button</option>
-                    <option value="group">group</option>
-                    <option value="text">text</option>
-                    <option value="list">list</option>
+                    {exportKinds.map((kind) => (
+                      <option key={kind} value={kind}>
+                        {kind}
+                      </option>
+                    ))}
                   </select>
                 </label>
                 <button type="button" onClick={mergeSelectedExportNodesFromTree} disabled={!canMergeNodes}>

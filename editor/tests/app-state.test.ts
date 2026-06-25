@@ -215,7 +215,7 @@ describe('app state', () => {
       {
         id: 'source_1',
         name: 'Button',
-        exportKind: 'group',
+        exportKind: 'VGLayout',
         sourceLayerIds: [1],
         children: [
           {

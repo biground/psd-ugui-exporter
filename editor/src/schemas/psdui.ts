@@ -1,6 +1,8 @@
 import type { Rect, SourceLayer } from './source';
 
-export type ExportKind = 'group' | 'image' | 'text' | 'button' | 'list';
+export const exportKinds = ['image', 'text', 'button', 'list', 'VGLayout', 'HGLayout', 'Item'] as const;
+
+export type ExportKind = typeof exportKinds[number];
 
 export interface ListSettings {
   direction: 'vertical' | 'horizontal';

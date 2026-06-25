@@ -25,7 +25,7 @@ const baseLayer = {
 >;
 
 describe('createDefaultExportTree', () => {
-  test('omits hidden source layers and infers text nodes from visible source text', () => {
+  test('omits hidden source layers and infers layout/text nodes from visible source layers', () => {
     const sourceTree: SourceLayer[] = [
       {
         ...baseLayer,
@@ -62,6 +62,7 @@ describe('createDefaultExportTree', () => {
 
     expect(exportTree).toHaveLength(1);
     expect(exportTree[0].name).toBe('Root');
+    expect(exportTree[0].exportKind).toBe('VGLayout');
     expect(exportTree[0].children).toHaveLength(1);
     expect(exportTree[0].children.map((child) => child.name)).toEqual(['Title']);
     expect(exportTree[0].children[0].exportKind).toBe('text');
