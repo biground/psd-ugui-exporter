@@ -1,10 +1,5 @@
 import type { SourceLayer } from '../schemas/source';
 
-type MouseClickEvent = {
-  metaKey: boolean;
-  ctrlKey: boolean;
-};
-
 interface SourceTreeProps {
   layers: SourceLayer[];
   selectedLayerIds: number[];
@@ -12,7 +7,6 @@ interface SourceTreeProps {
   exportedSourceLayerIds: number[];
   onSelectLayer: (layerId: number) => void;
   onAddLayerToExportTree: (layerId: number) => void;
-  onToggleLayerSelection: (layerId: number) => void;
   onToggleLayerVisibility: (layerId: number) => void;
 }
 
@@ -23,7 +17,6 @@ export function SourceTree({
   exportedSourceLayerIds,
   onSelectLayer,
   onAddLayerToExportTree,
-  onToggleLayerSelection,
   onToggleLayerVisibility
 }: SourceTreeProps) {
   if (layers.length === 0) {
@@ -42,7 +35,6 @@ export function SourceTree({
           exportedSourceLayerIds={exportedSourceLayerIds}
           onSelectLayer={onSelectLayer}
           onAddLayerToExportTree={onAddLayerToExportTree}
-          onToggleLayerSelection={onToggleLayerSelection}
           onToggleLayerVisibility={onToggleLayerVisibility}
         />
       ))}
@@ -63,21 +55,11 @@ function SourceLayerRow({
   exportedSourceLayerIds,
   onSelectLayer,
   onAddLayerToExportTree,
-  onToggleLayerSelection,
   onToggleLayerVisibility
 }: SourceLayerRowProps) {
   const isSelected = selectedLayerIds.includes(layer.id);
   const isPreviewVisible = layer.visible && !hiddenLayerIds.includes(layer.id);
   const hasExportedSourceInSubtree = containsExportedSourceLayer(layer, exportedSourceLayerIds);
-
-  function selectLayer(event: MouseClickEvent) {
-    if (event.metaKey || event.ctrlKey) {
-      onToggleLayerSelection(layer.id);
-      return;
-    }
-
-    onSelectLayer(layer.id);
-  }
 
   return (
     <div role="treeitem" aria-selected={isSelected}>
@@ -94,14 +76,7 @@ function SourceLayerRow({
         >
           <span className="eye-icon" aria-hidden="true" />
         </button>
-        <input
-          type="checkbox"
-          className="layer-selection-checkbox"
-          checked={isSelected}
-          aria-label={`Select ${layer.name}`}
-          onChange={() => onToggleLayerSelection(layer.id)}
-        />
-        <button type="button" className="tree-row-main" onClick={selectLayer}>
+        <button type="button" className="tree-row-main" onClick={() => onSelectLayer(layer.id)}>
           <span className="tree-name">{layer.name}</span>
           <span className="tree-meta">{layer.kind}</span>
         </button>
@@ -126,7 +101,6 @@ function SourceLayerRow({
           exportedSourceLayerIds={exportedSourceLayerIds}
           onSelectLayer={onSelectLayer}
           onAddLayerToExportTree={onAddLayerToExportTree}
-          onToggleLayerSelection={onToggleLayerSelection}
           onToggleLayerVisibility={onToggleLayerVisibility}
         />
       ))}

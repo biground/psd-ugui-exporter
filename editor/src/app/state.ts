@@ -1,12 +1,14 @@
 import { createExportNodeFromSources } from '../domain/export-tree';
 import type { ExportKind, ExportNode, ListSettings, PSDUIProject } from '../schemas/psdui';
 import type { SourceLayer } from '../schemas/source';
+import { unionRects } from '../domain/rect';
 
 export interface AppState {
   project: PSDUIProject | null;
   selectedSourceLayerIds: number[];
   hiddenSourceLayerIds: number[];
   selectedExportNodeId: string | null;
+  selectedExportNodeIds: string[];
   message: string | null;
 }
 
@@ -23,6 +25,7 @@ export function createEmptyState(): AppState {
     selectedSourceLayerIds: [],
     hiddenSourceLayerIds: [],
     selectedExportNodeId: null,
+    selectedExportNodeIds: [],
     message: null
   };
 }
@@ -34,14 +37,14 @@ export function selectSourceLayer(state: AppState, layerId: number): AppState {
   };
 }
 
-export function toggleSourceLayerSelection(state: AppState, layerId: number): AppState {
-  const isSelected = state.selectedSourceLayerIds.includes(layerId);
+export function toggleExportNodeSelection(state: AppState, nodeId: string): AppState {
+  const isSelected = state.selectedExportNodeIds.includes(nodeId);
 
   return {
     ...state,
-    selectedSourceLayerIds: isSelected
-      ? state.selectedSourceLayerIds.filter((selectedLayerId) => selectedLayerId !== layerId)
-      : [...state.selectedSourceLayerIds, layerId]
+    selectedExportNodeIds: isSelected
+      ? state.selectedExportNodeIds.filter((selectedNodeId) => selectedNodeId !== nodeId)
+      : [...state.selectedExportNodeIds, nodeId]
   };
 }
 
@@ -183,7 +186,77 @@ export function appendExportNode(state: AppState, node: ExportNode): AppState {
       exportTree: [...state.project.exportTree, node]
     },
     selectedExportNodeId: node.id,
+    selectedExportNodeIds: [],
     message: `Created export node "${node.name}".`
+  };
+}
+
+export function mergeSelectedExportNodes(
+  state: AppState,
+  id: string,
+  exportKind: ExportKind
+): AppState {
+  if (state.project === null) {
+    return {
+      ...state,
+      message: 'Open a PSD/PSB before merging export nodes.'
+    };
+  }
+
+  const selectedNodeIds = new Set(state.selectedExportNodeIds);
+  const selectedNodes = flattenExportNodes(state.project.exportTree).filter((node) =>
+    selectedNodeIds.has(node.id)
+  );
+
+  if (selectedNodes.length < 2) {
+    return {
+      ...state,
+      message: 'Select at least two export nodes before merging.'
+    };
+  }
+
+  const mergedNode = createExportNodeFromExportNodes(id, selectedNodes, exportKind);
+
+  return {
+    ...state,
+    project: {
+      ...state.project,
+      exportTree: [
+        ...removeExportNodesFromTree(state.project.exportTree, selectedNodeIds),
+        mergedNode
+      ]
+    },
+    selectedExportNodeId: mergedNode.id,
+    selectedExportNodeIds: [],
+    message: `Merged ${selectedNodes.length} export nodes into "${mergedNode.name}".`
+  };
+}
+
+export function unmergeExportNode(state: AppState, nodeId: string): AppState {
+  if (state.project === null) {
+    return state;
+  }
+
+  const node = findExportNodeById(state.project.exportTree, nodeId);
+
+  if (node?.mergedFrom === undefined || node.mergedFrom.length === 0) {
+    return {
+      ...state,
+      message: `Export node "${nodeId}" has no merge history.`
+    };
+  }
+
+  const restoredNodes = node.mergedFrom.map(cloneExportNode);
+
+  return {
+    ...state,
+    project: {
+      ...state.project,
+      exportTree: replaceExportNodeWithNodes(state.project.exportTree, nodeId, restoredNodes)
+    },
+    selectedExportNodeId: restoredNodes[0]?.id ?? null,
+    selectedExportNodeIds: [],
+    message: `Unmerged export node "${node.name}".`
   };
 }
 
@@ -206,13 +279,24 @@ export function removeExportNode(state: AppState, nodeId: string): AppState {
     return state;
   }
 
+  const removedNode = findExportNodeById(state.project.exportTree, nodeId);
+  const removedNodeIds = new Set(
+    removedNode === null ? [nodeId] : flattenExportNodes([removedNode]).map((node) => node.id)
+  );
+
   return {
     ...state,
     project: {
       ...state.project,
       exportTree: removeExportNodeFromTree(state.project.exportTree, nodeId)
     },
-    selectedExportNodeId: state.selectedExportNodeId === nodeId ? null : state.selectedExportNodeId,
+    selectedExportNodeId:
+      state.selectedExportNodeId !== null && removedNodeIds.has(state.selectedExportNodeId)
+        ? null
+        : state.selectedExportNodeId,
+    selectedExportNodeIds: state.selectedExportNodeIds.filter(
+      (selectedNodeId) => !removedNodeIds.has(selectedNodeId)
+    ),
     message: `Removed export node "${nodeId}".`
   };
 }
@@ -306,6 +390,75 @@ function removeExportNodeFromTree(exportTree: ExportNode[], nodeId: string): Exp
       ...node,
       children: removeExportNodeFromTree(node.children, nodeId)
     }));
+}
+
+function removeExportNodesFromTree(exportTree: ExportNode[], nodeIds: Set<string>): ExportNode[] {
+  return exportTree
+    .filter((node) => !nodeIds.has(node.id))
+    .map((node) => ({
+      ...node,
+      children: removeExportNodesFromTree(node.children, nodeIds)
+    }));
+}
+
+function replaceExportNodeWithNodes(
+  exportTree: ExportNode[],
+  nodeId: string,
+  replacementNodes: ExportNode[]
+): ExportNode[] {
+  return exportTree.flatMap((node) => {
+    if (node.id === nodeId) {
+      return replacementNodes;
+    }
+
+    return {
+      ...node,
+      children: replaceExportNodeWithNodes(node.children, nodeId, replacementNodes)
+    };
+  });
+}
+
+function createExportNodeFromExportNodes(
+  id: string,
+  exportNodes: ExportNode[],
+  exportKind: ExportKind
+): ExportNode {
+  const flattenedNodes = exportNodes.flatMap((node) => flattenExportNodes([node]));
+  const sourceLayerIds = [
+    ...new Set(flattenedNodes.flatMap((node) => node.sourceLayerIds))
+  ];
+  const rasterBounds = flattenedNodes
+    .map((node) => node.rasterBounds)
+    .filter((rect) => rect !== null);
+
+  return normalizeExportNode({
+    id,
+    name: exportNodes[0]?.name ?? 'Merged Export Node',
+    exportKind,
+    enabled: true,
+    sourceLayerIds,
+    rect: unionRects(flattenedNodes.map((node) => node.rect)),
+    rasterBounds: rasterBounds.length > 0 ? unionRects(rasterBounds) : null,
+    list: null,
+    children: [],
+    mergedFrom: exportNodes.map(cloneExportNode)
+  });
+}
+
+function cloneExportNode(node: ExportNode): ExportNode {
+  return {
+    ...node,
+    rect: { ...node.rect },
+    rasterBounds: node.rasterBounds === null ? null : { ...node.rasterBounds },
+    list: node.list === null
+      ? null
+      : {
+          ...node.list,
+          padding: { ...node.list.padding }
+        },
+    children: node.children.map(cloneExportNode),
+    mergedFrom: node.mergedFrom?.map(cloneExportNode)
+  };
 }
 
 function inferExportKind(sourceLayer: SourceLayer | undefined): ExportKind {

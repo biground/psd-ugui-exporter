@@ -6,11 +6,13 @@ import {
   createEmptyState,
   createExportNodeForSources,
   createProjectFromSourceDocument,
+  mergeSelectedExportNodes,
   moveExportNode,
   removeExportNode,
   selectSourceLayer,
+  toggleExportNodeSelection,
   toggleSourceLayerPreviewVisibility,
-  toggleSourceLayerSelection
+  unmergeExportNode
 } from '../src/app/state';
 import type { SourceLayer } from '../src/schemas/source';
 
@@ -33,14 +35,14 @@ describe('app state', () => {
     expect(state.selectedSourceLayerIds).toEqual([12]);
   });
 
-  test('toggles source layer selection for multi-select editing', () => {
-    const first = toggleSourceLayerSelection(createEmptyState(), 12);
-    const second = toggleSourceLayerSelection(first, 13);
-    const third = toggleSourceLayerSelection(second, 12);
+  test('toggles export node selection for multi-node editing', () => {
+    const first = toggleExportNodeSelection(createEmptyState(), 'source_12');
+    const second = toggleExportNodeSelection(first, 'source_13');
+    const third = toggleExportNodeSelection(second, 'source_12');
 
-    expect(first.selectedSourceLayerIds).toEqual([12]);
-    expect(second.selectedSourceLayerIds).toEqual([12, 13]);
-    expect(third.selectedSourceLayerIds).toEqual([13]);
+    expect(first.selectedExportNodeIds).toEqual(['source_12']);
+    expect(second.selectedExportNodeIds).toEqual(['source_12', 'source_13']);
+    expect(third.selectedExportNodeIds).toEqual(['source_13']);
   });
 
   test('toggles source layer preview visibility recursively without changing source metadata', () => {
@@ -278,6 +280,71 @@ describe('app state', () => {
 
     expect(removed.selectedExportNodeId).toBeNull();
     expect(removed.project?.exportTree.some((node) => node.id === 'merged_button')).toBe(false);
+  });
+
+  test('merges selected export nodes and restores them when unmerged', () => {
+    const state = {
+      ...createEmptyState(),
+      project: createProjectFromSourceDocument({
+        version: 1 as const,
+        source: {
+          path: '/tmp/menu.psb',
+          fileName: 'menu.psb'
+        },
+        document: {
+          width: 320,
+          height: 180
+        },
+        sourceTree: [
+          {
+            ...baseLayer,
+            id: 1,
+            name: 'Button BG',
+            sourceBounds: { x: 10, y: 10, width: 80, height: 30 },
+            rasterBounds: { x: 12, y: 12, width: 76, height: 26 },
+            image: { path: 'cache/bg.png', width: 76, height: 26 }
+          },
+          {
+            ...baseLayer,
+            id: 2,
+            name: 'Button Label',
+            kind: 'text',
+            sourceBounds: { x: 30, y: 18, width: 30, height: 14 },
+            rasterBounds: { x: 0, y: 0, width: 0, height: 0 },
+            text: { value: 'OK' }
+          }
+        ],
+        assetsDir: 'layers'
+      })
+    };
+
+    const added = addSourceLayerToExportTree(addSourceLayerToExportTree(state, 1), 2);
+    const selected = toggleExportNodeSelection(
+      toggleExportNodeSelection(added, 'source_1'),
+      'source_2'
+    );
+    const merged = mergeSelectedExportNodes(selected, 'merged_button', 'button');
+
+    expect(merged.selectedExportNodeId).toBe('merged_button');
+    expect(merged.selectedExportNodeIds).toEqual([]);
+    expect(merged.project?.exportTree).toMatchObject([
+      {
+        id: 'merged_button',
+        exportKind: 'button',
+        sourceLayerIds: [1, 2],
+        rect: { x: 10, y: 10, width: 80, height: 30 },
+        rasterBounds: { x: 12, y: 12, width: 76, height: 26 },
+        mergedFrom: [
+          { id: 'source_1', sourceLayerIds: [1] },
+          { id: 'source_2', sourceLayerIds: [2] }
+        ]
+      }
+    ]);
+
+    const unmerged = unmergeExportNode(merged, 'merged_button');
+
+    expect(unmerged.selectedExportNodeId).toBe('source_1');
+    expect(unmerged.project?.exportTree.map((node) => node.id)).toEqual(['source_1', 'source_2']);
   });
 
   test('moves export nodes among siblings', () => {

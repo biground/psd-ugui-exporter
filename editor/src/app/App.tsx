@@ -13,18 +13,17 @@ import { createOpenPsdDialogOptions } from './open-dialog';
 import { deriveDefaultProjectSettings, type ProjectSettings } from './project-settings';
 import {
   addSourceLayerToExportTree,
-  appendExportNode,
   collectExportedSourceLayerIds,
   createEmptyState,
-  createExportNodeForSources,
   createProjectFromSourceDocument,
   findExportNodeById,
-  findSourceLayersByIds,
+  mergeSelectedExportNodes,
   moveExportNode,
   removeExportNode,
   selectSourceLayer,
+  toggleExportNodeSelection,
   toggleSourceLayerPreviewVisibility,
-  toggleSourceLayerSelection,
+  unmergeExportNode,
   type SourceDocumentInput,
   updateExportNode
 } from './state';
@@ -99,35 +98,19 @@ export function App() {
         selectedSourceLayerIds: [],
         hiddenSourceLayerIds: [],
         selectedExportNodeId: project.exportTree[0]?.id ?? null,
+        selectedExportNodeIds: [],
         message: `Opened ${project.source.fileName}.`
       });
     });
   }
 
-  function createExportNode() {
+  function mergeSelectedExportNodesFromTree() {
     setState((current) => {
-      if (current.project === null) {
-        return {
-          ...current,
-          message: 'Open a PSD/PSB before creating export nodes.'
-        };
-      }
-
-      const sourceLayers = findSourceLayersByIds(
-        current.project.sourceTree,
-        current.selectedSourceLayerIds
+      return mergeSelectedExportNodes(
+        current,
+        `export_${Date.now().toString(36)}`,
+        newExportKind
       );
-
-      if (sourceLayers.length === 0) {
-        return {
-          ...current,
-          message: 'Select at least one source layer first.'
-        };
-      }
-
-      const node = createExportNodeForSources(`export_${Date.now().toString(36)}`, sourceLayers, newExportKind);
-
-      return appendExportNode(current, node);
     });
   }
 
@@ -171,7 +154,7 @@ export function App() {
   }
 
   function unmergeSelectedExportNode(nodeId: string) {
-    setState((current) => removeExportNode(current, nodeId));
+    setState((current) => unmergeExportNode(current, nodeId));
   }
 
   function addSourceLayerExportNode(layerId: number) {
@@ -186,7 +169,7 @@ export function App() {
     setState((current) => moveExportNode(current, nodeId, direction));
   }
 
-  const canCreateNode = state.project !== null && state.selectedSourceLayerIds.length > 0;
+  const canMergeNodes = state.project !== null && state.selectedExportNodeIds.length > 1;
   const project = state.project;
   const hasProject = project !== null;
 
@@ -216,7 +199,7 @@ export function App() {
                   Open Another
                 </button>
                 <label className="compact-select">
-                  <span>New node</span>
+                  <span>Merge as</span>
                   <select value={newExportKind} onChange={(event: SelectChangeEvent) => setNewExportKind(event.target.value as ExportKind)}>
                     <option value="image">image</option>
                     <option value="button">button</option>
@@ -225,8 +208,8 @@ export function App() {
                     <option value="list">list</option>
                   </select>
                 </label>
-                <button type="button" onClick={createExportNode} disabled={!canCreateNode}>
-                  Create Export Node
+                <button type="button" onClick={mergeSelectedExportNodesFromTree} disabled={!canMergeNodes}>
+                  Merge Export Nodes
                 </button>
                 <button type="button" onClick={saveProject}>
                   Save .psdui
@@ -271,9 +254,6 @@ export function App() {
                       setState((current) => selectSourceLayer(current, layerId))
                     }
                     onAddLayerToExportTree={addSourceLayerExportNode}
-                    onToggleLayerSelection={(layerId) =>
-                      setState((current) => toggleSourceLayerSelection(current, layerId))
-                    }
                     onToggleLayerVisibility={(layerId) =>
                       setState((current) => toggleSourceLayerPreviewVisibility(current, layerId))
                     }
@@ -286,10 +266,14 @@ export function App() {
                   <ExportTree
                     nodes={project.exportTree}
                     selectedNodeId={state.selectedExportNodeId}
+                    selectedNodeIds={state.selectedExportNodeIds}
                     onDeleteNode={deleteExportNode}
                     onMoveNode={moveSelectedExportNode}
                     onSelectNode={(nodeId) =>
                       setState((current) => ({ ...current, selectedExportNodeId: nodeId }))
+                    }
+                    onToggleNodeSelection={(nodeId) =>
+                      setState((current) => toggleExportNodeSelection(current, nodeId))
                     }
                   />
                 </section>
@@ -303,9 +287,9 @@ export function App() {
               <aside className="right-panel">
                 <Inspector
                   node={selectedExportNode}
-                  selectedSourceLayerCount={state.selectedSourceLayerIds.length}
+                  selectedExportNodeCount={state.selectedExportNodeIds.length}
                   onUpdateNode={updateSelectedExportNode}
-                  onMergeSelectedSources={createExportNode}
+                  onMergeSelectedExports={mergeSelectedExportNodesFromTree}
                   onUnmergeNode={unmergeSelectedExportNode}
                 />
               </aside>
@@ -605,14 +589,15 @@ h2 {
 }
 
 .source-tree-row {
-  grid-template-columns: 26px 18px minmax(0, 1fr) 26px;
+  grid-template-columns: 26px minmax(0, 1fr) 26px;
   gap: 6px;
   border: 1px solid transparent;
   border-radius: 6px;
 }
 
 .export-tree-row {
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: 18px auto minmax(0, 1fr) auto;
+  gap: 6px;
   border: 1px solid transparent;
   border-radius: 6px;
 }
@@ -694,7 +679,7 @@ h2 {
   transform: rotate(-32deg);
 }
 
-.layer-selection-checkbox {
+.node-selection-checkbox {
   width: 16px;
   height: 16px;
   margin: 0;
@@ -954,7 +939,7 @@ h2 {
   overflow: auto;
 }
 
-.source-selection-actions {
+.selection-actions {
   display: grid;
   gap: 10px;
   padding: 10px;
@@ -963,17 +948,17 @@ h2 {
   background: #ffffff;
 }
 
-.source-selection-actions div {
+.selection-actions div {
   display: grid;
   gap: 2px;
 }
 
-.source-selection-actions strong {
+.selection-actions strong {
   color: #253244;
   font-size: 13px;
 }
 
-.source-selection-actions span {
+.selection-actions span {
   color: #64748b;
   font-size: 12px;
 }

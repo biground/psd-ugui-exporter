@@ -24,6 +24,7 @@ export interface ExportNode {
   rasterBounds: Rect | null;
   list: ListSettings | null;
   children: ExportNode[];
+  mergedFrom?: ExportNode[];
 }
 
 export interface PSDUIProject {

@@ -3,17 +3,21 @@ import type { ExportNode } from '../schemas/psdui';
 interface ExportTreeProps {
   nodes: ExportNode[];
   selectedNodeId: string | null;
+  selectedNodeIds: string[];
   onDeleteNode: (nodeId: string) => void;
   onMoveNode: (nodeId: string, direction: 'up' | 'down') => void;
   onSelectNode: (nodeId: string) => void;
+  onToggleNodeSelection: (nodeId: string) => void;
 }
 
 export function ExportTree({
   nodes,
   selectedNodeId,
+  selectedNodeIds,
   onDeleteNode,
   onMoveNode,
-  onSelectNode
+  onSelectNode,
+  onToggleNodeSelection
 }: ExportTreeProps) {
   if (nodes.length === 0) {
     return <p className="empty-state">No export nodes yet.</p>;
@@ -29,9 +33,11 @@ export function ExportTree({
           siblingIndex={index}
           siblingCount={nodes.length}
           selectedNodeId={selectedNodeId}
+          selectedNodeIds={selectedNodeIds}
           onDeleteNode={onDeleteNode}
           onMoveNode={onMoveNode}
           onSelectNode={onSelectNode}
+          onToggleNodeSelection={onToggleNodeSelection}
         />
       ))}
     </div>
@@ -51,11 +57,14 @@ function ExportNodeRow({
   siblingIndex,
   siblingCount,
   selectedNodeId,
+  selectedNodeIds,
   onDeleteNode,
   onMoveNode,
-  onSelectNode
+  onSelectNode,
+  onToggleNodeSelection
 }: ExportNodeRowProps) {
   const isSelected = selectedNodeId === node.id;
+  const isChecked = selectedNodeIds.includes(node.id);
 
   return (
     <div role="treeitem" aria-selected={isSelected}>
@@ -63,6 +72,13 @@ function ExportNodeRow({
         className={`tree-row export-tree-row ${isSelected ? 'selected' : ''}`}
         style={{ paddingLeft: `${12 + depth * 14}px` }}
       >
+        <input
+          type="checkbox"
+          className="node-selection-checkbox"
+          checked={isChecked}
+          aria-label={`Select ${node.name} for merging`}
+          onChange={() => onToggleNodeSelection(node.id)}
+        />
         <span className={`status-dot ${node.enabled ? 'enabled' : 'disabled'}`} aria-hidden="true" />
         <button type="button" className="tree-row-main" onClick={() => onSelectNode(node.id)}>
           <span className="tree-name">{node.name}</span>
@@ -108,9 +124,11 @@ function ExportNodeRow({
           siblingIndex={index}
           siblingCount={node.children.length}
           selectedNodeId={selectedNodeId}
+          selectedNodeIds={selectedNodeIds}
           onDeleteNode={onDeleteNode}
           onMoveNode={onMoveNode}
           onSelectNode={onSelectNode}
+          onToggleNodeSelection={onToggleNodeSelection}
         />
       ))}
     </div>

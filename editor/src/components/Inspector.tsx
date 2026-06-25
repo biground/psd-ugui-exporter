@@ -2,9 +2,9 @@ import type { ExportKind, ExportNode, ListSettings } from '../schemas/psdui';
 
 interface InspectorProps {
   node: ExportNode | null;
-  selectedSourceLayerCount: number;
+  selectedExportNodeCount: number;
   onUpdateNode: (patch: Partial<ExportNode> | ((node: ExportNode) => ExportNode)) => void;
-  onMergeSelectedSources: () => void;
+  onMergeSelectedExports: () => void;
   onUnmergeNode: (nodeId: string) => void;
 }
 
@@ -15,18 +15,18 @@ type SelectChangeEvent = { target: HTMLSelectElement };
 
 export function Inspector({
   node,
-  selectedSourceLayerCount,
+  selectedExportNodeCount,
   onUpdateNode,
-  onMergeSelectedSources,
+  onMergeSelectedExports,
   onUnmergeNode
 }: InspectorProps) {
   if (node === null) {
     return (
       <section className="inspector-empty">
         <h2>Inspector</h2>
-        <SourceSelectionActions
-          selectedSourceLayerCount={selectedSourceLayerCount}
-          onMergeSelectedSources={onMergeSelectedSources}
+        <ExportSelectionActions
+          selectedExportNodeCount={selectedExportNodeCount}
+          onMergeSelectedExports={onMergeSelectedExports}
         />
         <p>Select an export node to edit its export semantics.</p>
       </section>
@@ -36,9 +36,9 @@ export function Inspector({
   return (
     <section className="inspector">
       <h2>Inspector</h2>
-      <SourceSelectionActions
-        selectedSourceLayerCount={selectedSourceLayerCount}
-        onMergeSelectedSources={onMergeSelectedSources}
+      <ExportSelectionActions
+        selectedExportNodeCount={selectedExportNodeCount}
+        onMergeSelectedExports={onMergeSelectedExports}
       />
       <label className="field">
         <span>Name</span>
@@ -72,7 +72,7 @@ export function Inspector({
         <span>Source layer ids</span>
         <output>{node.sourceLayerIds.join(', ') || 'None'}</output>
       </div>
-      {node.sourceLayerIds.length > 1 ? (
+      {node.mergedFrom !== undefined && node.mergedFrom.length > 0 ? (
         <button type="button" className="danger-button" onClick={() => onUnmergeNode(node.id)}>
           Unmerge Node
         </button>
@@ -84,31 +84,31 @@ export function Inspector({
   );
 }
 
-interface SourceSelectionActionsProps {
-  selectedSourceLayerCount: number;
-  onMergeSelectedSources: () => void;
+interface ExportSelectionActionsProps {
+  selectedExportNodeCount: number;
+  onMergeSelectedExports: () => void;
 }
 
-function SourceSelectionActions({
-  selectedSourceLayerCount,
-  onMergeSelectedSources
-}: SourceSelectionActionsProps) {
-  if (selectedSourceLayerCount === 0) {
+function ExportSelectionActions({
+  selectedExportNodeCount,
+  onMergeSelectedExports
+}: ExportSelectionActionsProps) {
+  if (selectedExportNodeCount === 0) {
     return null;
   }
 
   return (
-    <section className="source-selection-actions" aria-label="Source selection actions">
+    <section className="selection-actions" aria-label="Export selection actions">
       <div>
-        <strong>Source selection</strong>
-        <span>{selectedSourceLayerCount} layer{selectedSourceLayerCount === 1 ? '' : 's'}</span>
+        <strong>Export selection</strong>
+        <span>{selectedExportNodeCount} node{selectedExportNodeCount === 1 ? '' : 's'}</span>
       </div>
       <button
         type="button"
-        onClick={onMergeSelectedSources}
-        disabled={selectedSourceLayerCount < 2}
+        onClick={onMergeSelectedExports}
+        disabled={selectedExportNodeCount < 2}
       >
-        Merge Selected Layers
+        Merge Selected Nodes
       </button>
     </section>
   );
