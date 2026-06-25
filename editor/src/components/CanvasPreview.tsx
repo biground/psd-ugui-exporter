@@ -15,7 +15,11 @@ import {
   collectVisiblePreviewTextLayers,
   resolveLayerImagePath
 } from '../domain/preview-assets';
-import { createPreviewFontFamily } from '../domain/preview-text-style';
+import {
+  createPreviewFontFamily,
+  projectPreviewFontFamily,
+  projectPreviewFontPath
+} from '../domain/preview-text-style';
 import type { PSDUIProject } from '../schemas/psdui';
 import type { SourceText } from '../schemas/source';
 
@@ -120,9 +124,17 @@ export function CanvasPreview({
     hiddenSourceLayerIds
   });
   const zoomLabel = `${Math.round(effectiveZoom * 100)}%`;
+  const projectPreviewFontUrl = convertFileSrc(projectPreviewFontPath);
 
   return (
     <section className="canvas-stage" aria-label="Canvas preview">
+      <style>
+        {`@font-face {
+  font-family: ${JSON.stringify(projectPreviewFontFamily)};
+  src: url(${JSON.stringify(projectPreviewFontUrl)}) format("opentype");
+  font-display: block;
+}`}
+      </style>
       <div className="canvas-info">
         <div className="canvas-document-meta">
           <strong>{project.source.fileName}</strong>

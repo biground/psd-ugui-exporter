@@ -1,4 +1,8 @@
-const fallbackFontFamily = 'Inter, ui-sans-serif, system-ui, sans-serif';
+export const projectPreviewFontFamily = 'PSDUI Project Preview Font';
+export const projectPreviewFontPath =
+  '/Volumes/ExtremeSSD/WorkSpace/azeroth-client/Assets/Game/Groups/Core/Modules/Core/Font/Normal/SourceHanSans-Bold.otf';
+
+const fallbackFontFamily = `${JSON.stringify(projectPreviewFontFamily)}, Inter, ui-sans-serif, system-ui, sans-serif`;
 
 export function createPreviewFontFamily(fontName: string | null | undefined): string {
   const rawName = fontName?.trim();
