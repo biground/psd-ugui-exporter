@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronRight, GripVertical, X } from 'lucide-react';
 
 import { isTreeNodeCollapsed, toggleCollapsedNodeId } from '../domain/tree-collapse';
@@ -25,17 +25,67 @@ export function ExportTree({
   onSelectNode,
   onToggleNodeSelection
 }: ExportTreeProps) {
+  const treeRef = useRef<HTMLDivElement | null>(null);
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<string[]>([]);
   const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
   const [dragTarget, setDragTarget] = useState<ExportTreeDragTarget | null>(null);
+  const dragTargetRef = useRef<ExportTreeDragTarget | null>(null);
+
+  useEffect(() => {
+    if (draggedNodeId === null) {
+      return;
+    }
+
+    const activeDraggedNodeId = draggedNodeId;
+    const tree = treeRef.current;
+    const ownerWindow = tree?.ownerDocument.defaultView ?? window;
+
+    function finishDrag() {
+      setDraggedNodeId(null);
+      dragTargetRef.current = null;
+      setDragTarget(null);
+    }
+
+    function handlePointerMove(event: PointerEvent) {
+      if (treeRef.current === null) {
+        return;
+      }
+
+      event.preventDefault();
+      const nextDragTarget = findExportNodeDropTarget(treeRef.current, activeDraggedNodeId, event);
+      dragTargetRef.current = nextDragTarget;
+      setDragTarget(nextDragTarget);
+    }
+
+    function handlePointerUp(event: PointerEvent) {
+      event.preventDefault();
+      const currentDragTarget = dragTargetRef.current;
+
+      if (currentDragTarget !== null) {
+        onDropNode(activeDraggedNodeId, currentDragTarget.nodeId, currentDragTarget.position);
+      }
+
+      finishDrag();
+    }
+
+    ownerWindow.addEventListener('pointermove', handlePointerMove);
+    ownerWindow.addEventListener('pointerup', handlePointerUp);
+    ownerWindow.addEventListener('pointercancel', finishDrag);
+
+    return () => {
+      ownerWindow.removeEventListener('pointermove', handlePointerMove);
+      ownerWindow.removeEventListener('pointerup', handlePointerUp);
+      ownerWindow.removeEventListener('pointercancel', finishDrag);
+    };
+  }, [draggedNodeId, onDropNode]);
 
   if (nodes.length === 0) {
     return <p className="empty-state">No export nodes yet.</p>;
   }
 
   return (
-    <div className="tree" role="tree" aria-label="Export nodes">
-      {nodes.map((node, index) => (
+    <div className="tree" role="tree" aria-label="Export nodes" ref={treeRef}>
+      {nodes.map((node) => (
         <ExportNodeRow
           key={node.id}
           node={node}
@@ -45,13 +95,7 @@ export function ExportTree({
           selectedNodeId={selectedNodeId}
           selectedNodeIds={selectedNodeIds}
           onDeleteNode={onDeleteNode}
-          onDropNode={onDropNode}
           onDragNodeStart={setDraggedNodeId}
-          onDragNodeEnd={() => {
-            setDraggedNodeId(null);
-            setDragTarget(null);
-          }}
-          onDragTargetChange={setDragTarget}
           onSelectNode={onSelectNode}
           onToggleNodeSelection={onToggleNodeSelection}
           collapsedNodeIds={collapsedNodeIds}
@@ -69,14 +113,12 @@ interface ExportTreeDragTarget {
   position: ExportNodeDropPosition;
 }
 
-interface ExportNodeRowProps extends Omit<ExportTreeProps, 'nodes'> {
+interface ExportNodeRowProps extends Omit<ExportTreeProps, 'nodes' | 'onDropNode'> {
   node: ExportNode;
   depth: number;
   draggedNodeId: string | null;
   dragTarget: ExportTreeDragTarget | null;
   onDragNodeStart: (nodeId: string) => void;
-  onDragNodeEnd: () => void;
-  onDragTargetChange: (target: ExportTreeDragTarget | null) => void;
   collapsedNodeIds: string[];
   onToggleNodeCollapse: (nodeId: string) => void;
 }
@@ -89,10 +131,7 @@ function ExportNodeRow({
   selectedNodeId,
   selectedNodeIds,
   onDeleteNode,
-  onDropNode,
   onDragNodeStart,
-  onDragNodeEnd,
-  onDragTargetChange,
   onSelectNode,
   onToggleNodeSelection,
   collapsedNodeIds,
@@ -115,37 +154,7 @@ function ExportNodeRow({
           dropPosition !== null ? `drop-${dropPosition}` : ''
         ].filter(Boolean).join(' ')}
         style={{ paddingLeft: `${12 + depth * 14}px` }}
-        onDragOver={(event: ExportTreeDragEvent) => {
-          if (draggedNodeId === node.id) {
-            return;
-          }
-
-          event.preventDefault();
-          if (event.dataTransfer !== undefined) {
-            event.dataTransfer.dropEffect = 'move';
-          }
-          onDragTargetChange({
-            nodeId: node.id,
-            position: resolveDropPosition(event)
-          });
-        }}
-        onDragLeave={() => {
-          if (dragTarget?.nodeId === node.id) {
-            onDragTargetChange(null);
-          }
-        }}
-        onDrop={(event: ExportTreeDragEvent) => {
-          const resolvedDraggedNodeId = resolveDraggedNodeId(draggedNodeId, event);
-
-          if (resolvedDraggedNodeId === null || resolvedDraggedNodeId === node.id) {
-            return;
-          }
-
-          event.preventDefault();
-          const position = resolveDropPosition(event);
-          onDropNode(resolvedDraggedNodeId, node.id, position);
-          onDragNodeEnd();
-        }}
+        data-export-node-id={node.id}
       >
         {hasChildren ? (
           <button
@@ -167,15 +176,16 @@ function ExportNodeRow({
         <button
           type="button"
           className="icon-button export-node-drag-handle"
-          draggable
           aria-label={`Drag ${node.name}`}
           title="Drag to reorder"
-          onDragStart={(event: ExportTreeDragStartEvent) => {
-            event.dataTransfer.effectAllowed = 'move';
-            event.dataTransfer.setData('text/plain', node.id);
+          onPointerDown={(event: ExportTreePointerDownEvent) => {
+            if (event.button !== 0) {
+              return;
+            }
+
+            event.preventDefault();
             onDragNodeStart(node.id);
           }}
-          onDragEnd={onDragNodeEnd}
         >
           <GripVertical aria-hidden="true" className="button-icon" size={14} />
         </button>
@@ -203,7 +213,7 @@ function ExportNodeRow({
           </button>
         </div>
       </div>
-      {isCollapsed ? null : node.children.map((child, index) => (
+      {isCollapsed ? null : node.children.map((child) => (
         <ExportNodeRow
           key={child.id}
           node={child}
@@ -213,10 +223,7 @@ function ExportNodeRow({
           selectedNodeId={selectedNodeId}
           selectedNodeIds={selectedNodeIds}
           onDeleteNode={onDeleteNode}
-          onDropNode={onDropNode}
           onDragNodeStart={onDragNodeStart}
-          onDragNodeEnd={onDragNodeEnd}
-          onDragTargetChange={onDragTargetChange}
           onSelectNode={onSelectNode}
           onToggleNodeSelection={onToggleNodeSelection}
           collapsedNodeIds={collapsedNodeIds}
@@ -227,28 +234,21 @@ function ExportNodeRow({
   );
 }
 
-interface ExportTreeDragStartEvent {
-  dataTransfer: {
-    effectAllowed: string;
-    setData: (format: string, data: string) => void;
-  };
-}
-
-interface ExportTreeDragEvent {
+interface ExportTreePointerPosition {
+  clientX: number;
   clientY: number;
-  preventDefault: () => void;
-  dataTransfer?: {
-    dropEffect?: string;
-    getData: (format: string) => string;
-  };
-  currentTarget: {
-    getBoundingClientRect: () => { top: number; height: number };
-  };
 }
 
-function resolveDropPosition(event: ExportTreeDragEvent): ExportNodeDropPosition {
-  const bounds = event.currentTarget.getBoundingClientRect();
-  const y = event.clientY - bounds.top;
+interface ExportTreePointerDownEvent {
+  button: number;
+  preventDefault: () => void;
+}
+
+function resolveDropPosition(
+  clientY: number,
+  bounds: { top: number; height: number }
+): ExportNodeDropPosition {
+  const y = clientY - bounds.top;
 
   if (y < bounds.height * 0.28) {
     return 'before';
@@ -261,16 +261,26 @@ function resolveDropPosition(event: ExportTreeDragEvent): ExportNodeDropPosition
   return 'inside';
 }
 
-function resolveDraggedNodeId(
-  draggedNodeId: string | null,
-  event: ExportTreeDragEvent
-): string | null {
-  if (draggedNodeId !== null) {
-    return draggedNodeId;
+function findExportNodeDropTarget(
+  tree: HTMLElement,
+  draggedNodeId: string,
+  position: ExportTreePointerPosition
+): ExportTreeDragTarget | null {
+  const element = tree.ownerDocument.elementFromPoint(position.clientX, position.clientY);
+  const row = element?.closest<HTMLElement>('[data-export-node-id]');
+
+  if (row === undefined || row === null || !tree.contains(row)) {
+    return null;
   }
 
-  const dataTransferValue = event.dataTransfer?.getData('text/plain')?.trim();
-  return dataTransferValue === undefined || dataTransferValue.length === 0
-    ? null
-    : dataTransferValue;
+  const targetNodeId = row.dataset.exportNodeId;
+
+  if (targetNodeId === undefined || targetNodeId === draggedNodeId) {
+    return null;
+  }
+
+  return {
+    nodeId: targetNodeId,
+    position: resolveDropPosition(position.clientY, row.getBoundingClientRect())
+  };
 }

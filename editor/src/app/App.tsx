@@ -1008,6 +1008,8 @@ h2 {
 .export-node-drag-handle {
   color: #64748b;
   cursor: grab;
+  touch-action: none;
+  user-select: none;
 }
 
 .export-node-drag-handle:active {

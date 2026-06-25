@@ -95,12 +95,12 @@ describe('createExportNodeFromSources', () => {
 describe('ExportTree component', () => {
   test('uses a drag handle for arbitrary structure changes instead of up and down buttons', () => {
     expect(exportTree).toContain('GripVertical');
-    expect(exportTree).toContain('draggable');
-    expect(exportTree).toContain('onDropNode');
-    expect(exportTree).toContain('dataTransfer?.getData');
-    expect(exportTree).toContain("dropEffect = 'move'");
-    expect(exportTree).toContain('resolveDraggedNodeId');
-    expect(exportTree).not.toContain('draggedNodeId === null || draggedNodeId === node.id');
+    expect(exportTree).toContain('onPointerDown');
+    expect(exportTree).toContain('elementFromPoint');
+    expect(exportTree).toContain('findExportNodeDropTarget');
+    expect(exportTree).not.toContain('draggable');
+    expect(exportTree).not.toContain('onDragOver=');
+    expect(exportTree).not.toContain('onDrop=');
     expect(exportTree).not.toContain('ArrowUp');
     expect(exportTree).not.toContain('ArrowDown');
     expect(exportTree).not.toContain('Move up');
