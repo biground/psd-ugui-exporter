@@ -1,4 +1,5 @@
 import { convertFileSrc } from '@tauri-apps/api/core';
+import { ZoomIn, ZoomOut } from 'lucide-react';
 import { useLayoutEffect, useRef, useState } from 'react';
 
 import { collectExportedSourceLayerIds } from '../app/state';
@@ -176,8 +177,9 @@ export function CanvasPreview({
               setManualZoom((current) => clampZoom(current - 0.25));
             }}
             aria-label="Zoom out"
+            title="Zoom out"
           >
-            -
+            <ZoomOut aria-hidden="true" className="button-icon" size={15} />
           </button>
           <output>{zoomLabel}</output>
           <button
@@ -187,8 +189,9 @@ export function CanvasPreview({
               setManualZoom((current) => clampZoom(current + 0.25));
             }}
             aria-label="Zoom in"
+            title="Zoom in"
           >
-            +
+            <ZoomIn aria-hidden="true" className="button-icon" size={15} />
           </button>
           <button
             type="button"

@@ -1,3 +1,5 @@
+import { ArrowRight, Eye, EyeOff } from 'lucide-react';
+
 import type { SourceLayer } from '../schemas/source';
 
 interface SourceTreeProps {
@@ -74,7 +76,11 @@ function SourceLayerRow({
           title={`${isPreviewVisible ? 'Hide' : 'Show'} in preview`}
           onClick={() => onToggleLayerVisibility(layer.id)}
         >
-          <span className="eye-icon" aria-hidden="true" />
+          {isPreviewVisible ? (
+            <Eye aria-hidden="true" className="button-icon" size={15} />
+          ) : (
+            <EyeOff aria-hidden="true" className="button-icon" size={15} />
+          )}
         </button>
         <button type="button" className="tree-row-main" onClick={() => onSelectLayer(layer.id)}>
           <span className="tree-name">{layer.name}</span>
@@ -88,7 +94,7 @@ function SourceLayerRow({
           disabled={hasExportedSourceInSubtree}
           onClick={() => onAddLayerToExportTree(layer.id)}
         >
-          &gt;
+          <ArrowRight aria-hidden="true" className="button-icon" size={15} />
         </button>
       </div>
       {layer.children.map((child) => (

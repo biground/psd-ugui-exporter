@@ -1,3 +1,5 @@
+import { ArrowDown, ArrowUp, X } from 'lucide-react';
+
 import type { ExportNode } from '../schemas/psdui';
 
 interface ExportTreeProps {
@@ -93,7 +95,7 @@ function ExportNodeRow({
             disabled={siblingIndex === 0}
             onClick={() => onMoveNode(node.id, 'up')}
           >
-            ^
+            <ArrowUp aria-hidden="true" className="button-icon" size={14} />
           </button>
           <button
             type="button"
@@ -103,7 +105,7 @@ function ExportNodeRow({
             disabled={siblingIndex === siblingCount - 1}
             onClick={() => onMoveNode(node.id, 'down')}
           >
-            v
+            <ArrowDown aria-hidden="true" className="button-icon" size={14} />
           </button>
           <button
             type="button"
@@ -112,7 +114,7 @@ function ExportNodeRow({
             title="Delete"
             onClick={() => onDeleteNode(node.id)}
           >
-            <span className="delete-icon" aria-hidden="true" />
+            <X aria-hidden="true" className="button-icon" size={14} />
           </button>
         </div>
       </div>

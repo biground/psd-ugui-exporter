@@ -639,44 +639,14 @@ h2 {
   background: #ffffff;
 }
 
-.eye-icon {
-  position: relative;
-  width: 15px;
-  height: 9px;
-  border: 1.5px solid #526173;
-  border-radius: 999px / 70%;
+.layer-visibility-toggle.is-hidden {
+  color: #a8b0bd;
 }
 
-.eye-icon::before {
-  content: "";
-  position: absolute;
-  left: 50%;
-  top: 50%;
-  width: 4px;
-  height: 4px;
-  border-radius: 999px;
-  background: #526173;
-  transform: translate(-50%, -50%);
-}
-
-.layer-visibility-toggle.is-hidden .eye-icon {
-  border-color: #a8b0bd;
-}
-
-.layer-visibility-toggle.is-hidden .eye-icon::before {
-  background: #a8b0bd;
-}
-
-.layer-visibility-toggle.is-hidden .eye-icon::after {
-  content: "";
-  position: absolute;
-  left: -2px;
-  top: 3px;
-  width: 19px;
-  height: 1.5px;
-  border-radius: 999px;
-  background: #a8b0bd;
-  transform: rotate(-32deg);
+.button-icon {
+  display: block;
+  flex: 0 0 auto;
+  stroke-width: 2;
 }
 
 .node-selection-checkbox {
@@ -712,32 +682,6 @@ h2 {
 
 .danger-icon-button {
   color: #b42318;
-}
-
-.delete-icon {
-  position: relative;
-  width: 11px;
-  height: 11px;
-}
-
-.delete-icon::before,
-.delete-icon::after {
-  content: "";
-  position: absolute;
-  left: 5px;
-  top: 0;
-  width: 1.5px;
-  height: 12px;
-  border-radius: 999px;
-  background: currentColor;
-}
-
-.delete-icon::before {
-  transform: rotate(45deg);
-}
-
-.delete-icon::after {
-  transform: rotate(-45deg);
 }
 
 .tree-row:hover {
