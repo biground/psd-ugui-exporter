@@ -302,9 +302,15 @@ export function App() {
     setState((current) => removeExportNode(current, nodeId));
   }
 
-  const canMergeNodes = state.project !== null && state.selectedExportNodeIds.length > 1;
   const project = state.project;
   const hasProject = project !== null;
+  const canMergeNodes = project !== null && (
+    state.selectedExportNodeIds.length > 1
+    || (
+      state.selectedExportNodeIds.length === 1
+      && (findExportNodeById(project.exportTree, state.selectedExportNodeIds[0])?.children.length ?? 0) > 0
+    )
+  );
 
   return (
     <>
@@ -469,6 +475,14 @@ export function App() {
                       }
                       onSelectNode={(nodeId) =>
                         setState((current) => ({ ...current, selectedExportNodeId: nodeId }))
+                      }
+                      onToggleNodeEnabled={(nodeId) =>
+                        setState((current) =>
+                          updateExportNode(current, nodeId, (node) => ({
+                            ...node,
+                            enabled: !node.enabled
+                          }))
+                        )
                       }
                       onToggleNodeSelection={(nodeId) =>
                         setState((current) => toggleExportNodeSelection(current, nodeId))
@@ -901,7 +915,7 @@ h2 {
 }
 
 .export-tree-row {
-  grid-template-columns: 24px 24px 18px auto minmax(0, 1fr) auto;
+  grid-template-columns: 24px 24px 24px 18px auto minmax(0, 1fr) auto;
   gap: 6px;
   border: 1px solid transparent;
   border-radius: 6px;

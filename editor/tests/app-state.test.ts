@@ -348,6 +348,73 @@ describe('app state', () => {
     expect(unmerged.project?.exportTree.map((node) => node.id)).toEqual(['source_1', 'source_2']);
   });
 
+  test('merges a single selected export node with its descendants', () => {
+    const state = {
+      ...createEmptyState(),
+      project: createProjectFromSourceDocument({
+        version: 1 as const,
+        source: {
+          path: '/tmp/menu.psb',
+          fileName: 'menu.psb'
+        },
+        document: {
+          width: 320,
+          height: 180
+        },
+        sourceTree: [
+          {
+            ...baseLayer,
+            id: 1,
+            name: 'Button',
+            kind: 'group',
+            sourceBounds: { x: 10, y: 10, width: 100, height: 40 },
+            rasterBounds: { x: 0, y: 0, width: 0, height: 0 },
+            children: [
+              {
+                ...baseLayer,
+                id: 2,
+                name: 'Label',
+                kind: 'text',
+                sourceBounds: { x: 30, y: 20, width: 40, height: 16 },
+                rasterBounds: { x: 0, y: 0, width: 0, height: 0 },
+                text: { value: 'Use' }
+              }
+            ]
+          }
+        ],
+        assetsDir: 'layers'
+      })
+    };
+
+    const added = addSourceLayerToExportTree(state, 1);
+    const selected = toggleExportNodeSelection(added, 'source_1');
+    const merged = mergeSelectedExportNodes(selected, 'merged_button', 'button');
+
+    expect(merged.selectedExportNodeId).toBe('merged_button');
+    expect(merged.project?.exportTree).toMatchObject([
+      {
+        id: 'merged_button',
+        exportKind: 'button',
+        sourceLayerIds: [1, 2],
+        children: [],
+        mergedFrom: [
+          {
+            id: 'source_1',
+            children: [
+              { id: 'source_2', sourceLayerIds: [2] }
+            ]
+          }
+        ]
+      }
+    ]);
+    expect(merged.message).toBe('Merged 2 export nodes into "Button".');
+
+    const unmerged = unmergeExportNode(merged, 'merged_button');
+
+    expect(unmerged.project?.exportTree[0]?.id).toBe('source_1');
+    expect(unmerged.project?.exportTree[0]?.children[0]?.id).toBe('source_2');
+  });
+
   test('moves export nodes among siblings', () => {
     const state = {
       ...createEmptyState(),

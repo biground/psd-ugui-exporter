@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronRight, GripVertical, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Eye, EyeOff, GripVertical, X } from 'lucide-react';
 
 import { isTreeNodeCollapsed, toggleCollapsedNodeId } from '../domain/tree-collapse';
 import type { ExportNode } from '../schemas/psdui';
@@ -13,6 +13,7 @@ interface ExportTreeProps {
   onDeleteNode: (nodeId: string) => void;
   onDropNode: (draggedNodeId: string, targetNodeId: string, position: ExportNodeDropPosition) => void;
   onSelectNode: (nodeId: string) => void;
+  onToggleNodeEnabled: (nodeId: string) => void;
   onToggleNodeSelection: (nodeId: string) => void;
 }
 
@@ -23,6 +24,7 @@ export function ExportTree({
   onDeleteNode,
   onDropNode,
   onSelectNode,
+  onToggleNodeEnabled,
   onToggleNodeSelection
 }: ExportTreeProps) {
   const treeRef = useRef<HTMLDivElement | null>(null);
@@ -97,6 +99,7 @@ export function ExportTree({
           onDeleteNode={onDeleteNode}
           onDragNodeStart={setDraggedNodeId}
           onSelectNode={onSelectNode}
+          onToggleNodeEnabled={onToggleNodeEnabled}
           onToggleNodeSelection={onToggleNodeSelection}
           collapsedNodeIds={collapsedNodeIds}
           onToggleNodeCollapse={(nodeId) =>
@@ -133,6 +136,7 @@ function ExportNodeRow({
   onDeleteNode,
   onDragNodeStart,
   onSelectNode,
+  onToggleNodeEnabled,
   onToggleNodeSelection,
   collapsedNodeIds,
   onToggleNodeCollapse
@@ -173,6 +177,19 @@ function ExportNodeRow({
         ) : (
           <span className="tree-collapse-spacer" aria-hidden="true" />
         )}
+        <button
+          type="button"
+          className={`icon-button layer-visibility-toggle ${node.enabled ? 'is-visible' : 'is-hidden'}`}
+          aria-label={`${node.enabled ? 'Disable' : 'Enable'} ${node.name} for export`}
+          title={`${node.enabled ? 'Disable' : 'Enable'} export`}
+          onClick={() => onToggleNodeEnabled(node.id)}
+        >
+          {node.enabled ? (
+            <Eye aria-hidden="true" className="button-icon" size={15} />
+          ) : (
+            <EyeOff aria-hidden="true" className="button-icon" size={15} />
+          )}
+        </button>
         <button
           type="button"
           className="icon-button export-node-drag-handle"
@@ -225,6 +242,7 @@ function ExportNodeRow({
           onDeleteNode={onDeleteNode}
           onDragNodeStart={onDragNodeStart}
           onSelectNode={onSelectNode}
+          onToggleNodeEnabled={onToggleNodeEnabled}
           onToggleNodeSelection={onToggleNodeSelection}
           collapsedNodeIds={collapsedNodeIds}
           onToggleNodeCollapse={onToggleNodeCollapse}

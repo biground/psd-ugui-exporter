@@ -214,8 +214,10 @@ export function mergeSelectedExportNodes(
   const selectedNodes = flattenExportNodes(state.project.exportTree).filter((node) =>
     selectedNodeIds.has(node.id)
   );
+  const selectedNodeCount = selectedNodes.length;
+  const canMergeSingleSubtree = selectedNodeCount === 1 && selectedNodes[0]!.children.length > 0;
 
-  if (selectedNodes.length < 2) {
+  if (selectedNodeCount < 2 && !canMergeSingleSubtree) {
     return {
       ...state,
       message: 'Select at least two export nodes before merging.'
@@ -235,7 +237,7 @@ export function mergeSelectedExportNodes(
     },
     selectedExportNodeId: mergedNode.id,
     selectedExportNodeIds: [],
-    message: `Merged ${selectedNodes.length} export nodes into "${mergedNode.name}".`
+    message: `Merged ${flattenExportNodes(selectedNodes).length} export nodes into "${mergedNode.name}".`
   };
 }
 
