@@ -318,9 +318,7 @@ export function CanvasPreview({
                 }}
                 title={highlight.name}
                 aria-label={`${highlight.name} ${highlight.kind} preview highlight`}
-              >
-                <span>{highlight.name}</span>
-              </div>
+              />
             );
           })}
         </div>

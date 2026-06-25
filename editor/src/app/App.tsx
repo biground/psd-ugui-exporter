@@ -914,9 +914,8 @@ h2 {
 .canvas-text-layer {
   position: absolute;
   display: block;
-  overflow: hidden;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+  overflow: visible;
+  white-space: pre;
   pointer-events: none;
   user-select: none;
 }
@@ -924,30 +923,16 @@ h2 {
 .canvas-highlight {
   position: absolute;
   display: block;
-  overflow: hidden;
   min-height: 0;
   border: 2px solid #dc2626;
   border-radius: 3px;
-  background: rgba(220, 38, 38, 0.12);
-  color: #991b1b;
-  padding: 2px;
-  text-align: left;
+  background: transparent;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.8);
   pointer-events: none;
 }
 
 .canvas-highlight.source {
   border-color: #2563eb;
-  background: rgba(37, 99, 235, 0.1);
-  color: #1d4ed8;
-}
-
-.canvas-highlight span {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 10px;
-  line-height: 1.2;
 }
 
 .inspector {
