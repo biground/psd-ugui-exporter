@@ -97,6 +97,10 @@ describe('ExportTree component', () => {
     expect(exportTree).toContain('GripVertical');
     expect(exportTree).toContain('draggable');
     expect(exportTree).toContain('onDropNode');
+    expect(exportTree).toContain('dataTransfer?.getData');
+    expect(exportTree).toContain("dropEffect = 'move'");
+    expect(exportTree).toContain('resolveDraggedNodeId');
+    expect(exportTree).not.toContain('draggedNodeId === null || draggedNodeId === node.id');
     expect(exportTree).not.toContain('ArrowUp');
     expect(exportTree).not.toContain('ArrowDown');
     expect(exportTree).not.toContain('Move up');

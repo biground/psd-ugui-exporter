@@ -116,11 +116,14 @@ function ExportNodeRow({
         ].filter(Boolean).join(' ')}
         style={{ paddingLeft: `${12 + depth * 14}px` }}
         onDragOver={(event: ExportTreeDragEvent) => {
-          if (draggedNodeId === null || draggedNodeId === node.id) {
+          if (draggedNodeId === node.id) {
             return;
           }
 
           event.preventDefault();
+          if (event.dataTransfer !== undefined) {
+            event.dataTransfer.dropEffect = 'move';
+          }
           onDragTargetChange({
             nodeId: node.id,
             position: resolveDropPosition(event)
@@ -132,13 +135,15 @@ function ExportNodeRow({
           }
         }}
         onDrop={(event: ExportTreeDragEvent) => {
-          if (draggedNodeId === null || draggedNodeId === node.id) {
+          const resolvedDraggedNodeId = resolveDraggedNodeId(draggedNodeId, event);
+
+          if (resolvedDraggedNodeId === null || resolvedDraggedNodeId === node.id) {
             return;
           }
 
           event.preventDefault();
           const position = resolveDropPosition(event);
-          onDropNode(draggedNodeId, node.id, position);
+          onDropNode(resolvedDraggedNodeId, node.id, position);
           onDragNodeEnd();
         }}
       >
@@ -232,6 +237,10 @@ interface ExportTreeDragStartEvent {
 interface ExportTreeDragEvent {
   clientY: number;
   preventDefault: () => void;
+  dataTransfer?: {
+    dropEffect?: string;
+    getData: (format: string) => string;
+  };
   currentTarget: {
     getBoundingClientRect: () => { top: number; height: number };
   };
@@ -250,4 +259,18 @@ function resolveDropPosition(event: ExportTreeDragEvent): ExportNodeDropPosition
   }
 
   return 'inside';
+}
+
+function resolveDraggedNodeId(
+  draggedNodeId: string | null,
+  event: ExportTreeDragEvent
+): string | null {
+  if (draggedNodeId !== null) {
+    return draggedNodeId;
+  }
+
+  const dataTransferValue = event.dataTransfer?.getData('text/plain')?.trim();
+  return dataTransferValue === undefined || dataTransferValue.length === 0
+    ? null
+    : dataTransferValue;
 }
