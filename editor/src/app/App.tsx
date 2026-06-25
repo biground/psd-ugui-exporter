@@ -9,9 +9,14 @@ import { Inspector } from '../components/Inspector';
 import { SourceTree } from '../components/SourceTree';
 import { createLayoutDocument } from '../domain/layout-export';
 import {
+  defaultWorkspacePanelWidths,
   defaultTreePanelWidths,
   resizeTreePanelsFromPointer,
+  resizeWorkspacePanelsFromPointer,
   treePanelMinWidth,
+  workspacePreviewPanelMinWidth,
+  workspaceTreePanelMinWidth,
+  type WorkspacePanelWidths,
   type TreePanelWidths
 } from '../domain/tree-panel-resize';
 import { exportKinds, type ExportKind, type ExportNode, type PSDUIProject } from '../schemas/psdui';
@@ -54,6 +59,17 @@ type TreePanelResizePointerEvent = {
     releasePointerCapture: (pointerId: number) => void;
   };
 };
+type WorkspacePanelResizePointerEvent = {
+  clientX: number;
+  pointerId: number;
+  preventDefault: () => void;
+  currentTarget: {
+    previousElementSibling: { getBoundingClientRect: () => { left: number; width: number } } | null;
+    nextElementSibling: { getBoundingClientRect: () => { width: number } } | null;
+    setPointerCapture: (pointerId: number) => void;
+    releasePointerCapture: (pointerId: number) => void;
+  };
+};
 
 export function App() {
   const recentFilesStore = useMemo(() => createRecentFilesStore(window.localStorage), []);
@@ -66,6 +82,10 @@ export function App() {
   const [newExportKind, setNewExportKind] = useState<ExportKind>('image');
   const [treePanelWidths, setTreePanelWidths] = useState<TreePanelWidths>(defaultTreePanelWidths);
   const [isTreePanelResizing, setTreePanelResizing] = useState(false);
+  const [workspacePanelWidths, setWorkspacePanelWidths] = useState<WorkspacePanelWidths>(
+    defaultWorkspacePanelWidths
+  );
+  const [isWorkspacePanelResizing, setWorkspacePanelResizing] = useState(false);
 
   const selectedExportNode = useMemo(() => {
     if (state.project === null) {
@@ -367,88 +387,147 @@ export function App() {
             <section
               className="workspace"
               style={{
+                '--tree-panel-group-width': `${workspacePanelWidths.treeWidth}px`,
+                '--preview-panel-width': `${workspacePanelWidths.previewWidth}px`,
                 '--source-tree-panel-width': `${treePanelWidths.sourceWidth}px`,
                 '--export-tree-panel-width': `${treePanelWidths.exportWidth}px`
               }}
             >
-              <aside className="tree-panel source-panel">
-                <section className="panel-section">
-                  <h2>Source Tree</h2>
-                  <SourceTree
-                    layers={project.sourceTree}
-                    selectedLayerIds={state.selectedSourceLayerIds}
-                    hiddenLayerIds={state.hiddenSourceLayerIds}
-                    exportedSourceLayerIds={exportedSourceLayerIds}
-                    onSelectLayer={(layerId) =>
-                      setState((current) => selectSourceLayer(current, layerId))
+              <div className="tree-panel-group">
+                <aside className="tree-panel source-panel">
+                  <section className="panel-section">
+                    <h2>Source Tree</h2>
+                    <SourceTree
+                      layers={project.sourceTree}
+                      selectedLayerIds={state.selectedSourceLayerIds}
+                      hiddenLayerIds={state.hiddenSourceLayerIds}
+                      exportedSourceLayerIds={exportedSourceLayerIds}
+                      onSelectLayer={(layerId) =>
+                        setState((current) => selectSourceLayer(current, layerId))
+                      }
+                      onAddLayerToExportTree={addSourceLayerExportNode}
+                      onToggleLayerVisibility={(layerId) =>
+                        setState((current) => toggleSourceLayerPreviewVisibility(current, layerId))
+                      }
+                    />
+                  </section>
+                </aside>
+                <div
+                  className={`tree-panel-resizer ${isTreePanelResizing ? 'resizing' : ''}`}
+                  role="separator"
+                  aria-label="Resize Source Tree and Export Tree panels"
+                  aria-orientation="vertical"
+                  aria-valuemin={treePanelMinWidth}
+                  aria-valuemax={
+                    treePanelWidths.sourceWidth + treePanelWidths.exportWidth - treePanelMinWidth
+                  }
+                  aria-valuenow={treePanelWidths.sourceWidth}
+                  title="Resize Source Tree and Export Tree panels"
+                  onPointerDown={(event: TreePanelResizePointerEvent) => {
+                    event.preventDefault();
+                    event.currentTarget.setPointerCapture(event.pointerId);
+                    setTreePanelResizing(true);
+                  }}
+                  onPointerMove={(event: TreePanelResizePointerEvent) => {
+                    if (!isTreePanelResizing || event.currentTarget.parentElement === null) {
+                      return;
                     }
-                    onAddLayerToExportTree={addSourceLayerExportNode}
-                    onToggleLayerVisibility={(layerId) =>
-                      setState((current) => toggleSourceLayerPreviewVisibility(current, layerId))
+
+                    event.preventDefault();
+                    const bounds = event.currentTarget.parentElement.getBoundingClientRect();
+                    setTreePanelWidths((current) =>
+                      resizeTreePanelsFromPointer({
+                        containerLeft: bounds.left,
+                        pointerX: event.clientX,
+                        totalWidth: workspacePanelWidths.treeWidth - 8
+                      })
+                    );
+                  }}
+                  onPointerUp={(event: TreePanelResizePointerEvent) => {
+                    if (!isTreePanelResizing) {
+                      return;
                     }
-                  />
-                </section>
-              </aside>
+
+                    event.preventDefault();
+                    event.currentTarget.releasePointerCapture(event.pointerId);
+                    setTreePanelResizing(false);
+                  }}
+                  onPointerCancel={() => setTreePanelResizing(false)}
+                />
+                <aside className="tree-panel export-panel">
+                  <section className="panel-section">
+                    <h2>Export Tree</h2>
+                    <ExportTree
+                      nodes={project.exportTree}
+                      selectedNodeId={state.selectedExportNodeId}
+                      selectedNodeIds={state.selectedExportNodeIds}
+                      onDeleteNode={deleteExportNode}
+                      onMoveNode={moveSelectedExportNode}
+                      onSelectNode={(nodeId) =>
+                        setState((current) => ({ ...current, selectedExportNodeId: nodeId }))
+                      }
+                      onToggleNodeSelection={(nodeId) =>
+                        setState((current) => toggleExportNodeSelection(current, nodeId))
+                      }
+                    />
+                  </section>
+                </aside>
+              </div>
               <div
-                className={`tree-panel-resizer ${isTreePanelResizing ? 'resizing' : ''}`}
+                className={`workspace-panel-resizer ${isWorkspacePanelResizing ? 'resizing' : ''}`}
                 role="separator"
-                aria-label="Resize Source Tree and Export Tree panels"
+                aria-label="Resize Export Tree and Preview panels"
                 aria-orientation="vertical"
-                aria-valuemin={treePanelMinWidth}
+                aria-valuemin={workspaceTreePanelMinWidth}
                 aria-valuemax={
-                  treePanelWidths.sourceWidth + treePanelWidths.exportWidth - treePanelMinWidth
+                  workspacePanelWidths.treeWidth
+                  + workspacePanelWidths.previewWidth
+                  - workspacePreviewPanelMinWidth
                 }
-                aria-valuenow={treePanelWidths.sourceWidth}
-                title="Resize Source Tree and Export Tree panels"
-                onPointerDown={(event: TreePanelResizePointerEvent) => {
+                aria-valuenow={workspacePanelWidths.treeWidth}
+                title="Resize Export Tree and Preview panels"
+                onPointerDown={(event: WorkspacePanelResizePointerEvent) => {
                   event.preventDefault();
                   event.currentTarget.setPointerCapture(event.pointerId);
-                  setTreePanelResizing(true);
+                  setWorkspacePanelResizing(true);
                 }}
-                onPointerMove={(event: TreePanelResizePointerEvent) => {
-                  if (!isTreePanelResizing || event.currentTarget.parentElement === null) {
+                onPointerMove={(event: WorkspacePanelResizePointerEvent) => {
+                  const treeElement = event.currentTarget.previousElementSibling;
+                  const previewElement = event.currentTarget.nextElementSibling;
+
+                  if (!isWorkspacePanelResizing || treeElement === null || previewElement === null) {
                     return;
                   }
 
                   event.preventDefault();
-                  const bounds = event.currentTarget.parentElement.getBoundingClientRect();
+                  const treeBounds = treeElement.getBoundingClientRect();
+                  const previewBounds = previewElement.getBoundingClientRect();
+                  const nextWorkspaceWidths = resizeWorkspacePanelsFromPointer({
+                    containerLeft: treeBounds.left,
+                    pointerX: event.clientX,
+                    totalWidth: treeBounds.width + previewBounds.width
+                  });
+
+                  setWorkspacePanelWidths(nextWorkspaceWidths);
                   setTreePanelWidths((current) =>
                     resizeTreePanelsFromPointer({
-                      containerLeft: bounds.left,
-                      pointerX: event.clientX,
-                      totalWidth: current.sourceWidth + current.exportWidth
+                      containerLeft: 0,
+                      pointerX: current.sourceWidth,
+                      totalWidth: nextWorkspaceWidths.treeWidth - 8
                     })
                   );
                 }}
-                onPointerUp={(event: TreePanelResizePointerEvent) => {
-                  if (!isTreePanelResizing) {
+                onPointerUp={(event: WorkspacePanelResizePointerEvent) => {
+                  if (!isWorkspacePanelResizing) {
                     return;
                   }
 
                   event.preventDefault();
                   event.currentTarget.releasePointerCapture(event.pointerId);
-                  setTreePanelResizing(false);
+                  setWorkspacePanelResizing(false);
                 }}
-                onPointerCancel={() => setTreePanelResizing(false)}
+                onPointerCancel={() => setWorkspacePanelResizing(false)}
               />
-              <aside className="tree-panel export-panel">
-                <section className="panel-section">
-                  <h2>Export Tree</h2>
-                  <ExportTree
-                    nodes={project.exportTree}
-                    selectedNodeId={state.selectedExportNodeId}
-                    selectedNodeIds={state.selectedExportNodeIds}
-                    onDeleteNode={deleteExportNode}
-                    onMoveNode={moveSelectedExportNode}
-                    onSelectNode={(nodeId) =>
-                      setState((current) => ({ ...current, selectedExportNodeId: nodeId }))
-                    }
-                    onToggleNodeSelection={(nodeId) =>
-                      setState((current) => toggleExportNodeSelection(current, nodeId))
-                    }
-                  />
-                </section>
-              </aside>
               <CanvasPreview
                 project={project}
                 selectedSourceLayerIds={state.selectedSourceLayerIds}
@@ -689,12 +768,22 @@ button:disabled {
 .workspace {
   display: grid;
   grid-template-columns:
-    var(--source-tree-panel-width, 280px)
+    var(--tree-panel-group-width, 568px)
     8px
-    var(--export-tree-panel-width, 280px)
     minmax(360px, 1fr)
     minmax(260px, 320px);
   min-height: 0;
+  overflow: hidden;
+}
+
+.tree-panel-group {
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns:
+    var(--source-tree-panel-width, 280px)
+    8px
+    var(--export-tree-panel-width, 280px);
   overflow: hidden;
 }
 
@@ -709,7 +798,8 @@ button:disabled {
   border-right: 1px solid #d8dee8;
 }
 
-.tree-panel-resizer {
+.tree-panel-resizer,
+.workspace-panel-resizer {
   position: relative;
   z-index: 2;
   min-height: 0;
@@ -720,7 +810,8 @@ button:disabled {
   touch-action: none;
 }
 
-.tree-panel-resizer::before {
+.tree-panel-resizer::before,
+.workspace-panel-resizer::before {
   content: '';
   position: absolute;
   top: 50%;
@@ -733,7 +824,9 @@ button:disabled {
 }
 
 .tree-panel-resizer:hover,
-.tree-panel-resizer.resizing {
+.tree-panel-resizer.resizing,
+.workspace-panel-resizer:hover,
+.workspace-panel-resizer.resizing {
   background: #dcecff;
 }
 
@@ -1183,7 +1276,12 @@ h2 {
     grid-template-columns: 1fr;
   }
 
-  .tree-panel-resizer {
+  .tree-panel-group {
+    grid-template-columns: 1fr;
+  }
+
+  .tree-panel-resizer,
+  .workspace-panel-resizer {
     display: none;
   }
 
