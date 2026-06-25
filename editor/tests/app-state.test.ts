@@ -8,6 +8,7 @@ import {
   createProjectFromSourceDocument,
   mergeSelectedExportNodes,
   moveExportNode,
+  moveExportNodeToDropTarget,
   removeExportNode,
   selectSourceLayer,
   toggleExportNodeSelection,
@@ -385,5 +386,94 @@ describe('app state', () => {
     expect(added.project?.exportTree.map((node) => node.id)).toEqual(['source_1', 'source_2']);
     expect(movedUp.project?.exportTree.map((node) => node.id)).toEqual(['source_2', 'source_1']);
     expect(movedDown.project?.exportTree.map((node) => node.id)).toEqual(['source_1', 'source_2']);
+  });
+
+  test('moves export nodes before after and inside arbitrary tree targets', () => {
+    const state = {
+      ...createEmptyState(),
+      project: createProjectFromSourceDocument({
+        version: 1 as const,
+        source: {
+          path: '/tmp/menu.psb',
+          fileName: 'menu.psb'
+        },
+        document: {
+          width: 320,
+          height: 180
+        },
+        sourceTree: [
+          { ...baseLayer, id: 1, name: 'Root', kind: 'group' },
+          { ...baseLayer, id: 2, name: 'Title', text: { value: 'Title' } },
+          { ...baseLayer, id: 3, name: 'Icon', image: { path: 'cache/icon.png', width: 10, height: 10 } }
+        ],
+        assetsDir: 'layers'
+      })
+    };
+    const added = addSourceLayerToExportTree(
+      addSourceLayerToExportTree(addSourceLayerToExportTree(state, 1), 2),
+      3
+    );
+
+    const inside = moveExportNodeToDropTarget(added, {
+      draggedNodeId: 'source_2',
+      targetNodeId: 'source_1',
+      position: 'inside'
+    });
+    const after = moveExportNodeToDropTarget(inside, {
+      draggedNodeId: 'source_3',
+      targetNodeId: 'source_1',
+      position: 'after'
+    });
+    const before = moveExportNodeToDropTarget(after, {
+      draggedNodeId: 'source_2',
+      targetNodeId: 'source_3',
+      position: 'before'
+    });
+
+    expect(inside.project?.exportTree.map((node) => node.id)).toEqual(['source_1', 'source_3']);
+    expect(inside.project?.exportTree[0]?.children.map((node) => node.id)).toEqual(['source_2']);
+    expect(after.project?.exportTree.map((node) => node.id)).toEqual(['source_1', 'source_3']);
+    expect(before.project?.exportTree.map((node) => node.id)).toEqual(['source_1', 'source_2', 'source_3']);
+    expect(before.project?.exportTree[0]?.children).toEqual([]);
+    expect(before.selectedExportNodeId).toBe('source_2');
+  });
+
+  test('does not move export nodes into their own descendants', () => {
+    const state = {
+      ...createEmptyState(),
+      project: createProjectFromSourceDocument({
+        version: 1 as const,
+        source: {
+          path: '/tmp/menu.psb',
+          fileName: 'menu.psb'
+        },
+        document: {
+          width: 320,
+          height: 180
+        },
+        sourceTree: [
+          {
+            ...baseLayer,
+            id: 1,
+            name: 'Root',
+            kind: 'group',
+            children: [
+              { ...baseLayer, id: 2, name: 'Child', text: { value: 'Child' } }
+            ]
+          }
+        ],
+        assetsDir: 'layers'
+      })
+    };
+    const added = addSourceLayerToExportTree(state, 1);
+
+    const moved = moveExportNodeToDropTarget(added, {
+      draggedNodeId: 'source_1',
+      targetNodeId: 'source_2',
+      position: 'inside'
+    });
+
+    expect(moved.project?.exportTree).toEqual(added.project?.exportTree);
+    expect(moved.message).toBe('Cannot move an export node into itself.');
   });
 });

@@ -18,6 +18,13 @@ export type SourceDocumentInput = Omit<PSDUIProject, 'exportTree' | 'cache'> & {
 
 type ExportNodeUpdater = Partial<ExportNode> | ((node: ExportNode) => ExportNode);
 export type MoveDirection = 'up' | 'down';
+export type ExportNodeDropPosition = 'before' | 'inside' | 'after';
+
+export interface ExportNodeDropTarget {
+  draggedNodeId: string;
+  targetNodeId: string;
+  position: ExportNodeDropPosition;
+}
 
 export function createEmptyState(): AppState {
   return {
@@ -316,6 +323,50 @@ export function moveExportNode(state: AppState, nodeId: string, direction: MoveD
   };
 }
 
+export function moveExportNodeToDropTarget(
+  state: AppState,
+  target: ExportNodeDropTarget
+): AppState {
+  if (state.project === null) {
+    return state;
+  }
+
+  if (target.draggedNodeId === target.targetNodeId) {
+    return {
+      ...state,
+      message: 'Cannot move an export node into itself.'
+    };
+  }
+
+  const draggedNode = findExportNodeById(state.project.exportTree, target.draggedNodeId);
+  const targetNode = findExportNodeById(state.project.exportTree, target.targetNodeId);
+
+  if (draggedNode === null || targetNode === null) {
+    return state;
+  }
+
+  const draggedNodeIds = new Set(flattenExportNodes([draggedNode]).map((node) => node.id));
+  if (draggedNodeIds.has(target.targetNodeId)) {
+    return {
+      ...state,
+      message: 'Cannot move an export node into itself.'
+    };
+  }
+
+  const movingNode = cloneExportNode(draggedNode);
+  const treeWithoutMovingNode = removeExportNodeFromTree(state.project.exportTree, target.draggedNodeId);
+
+  return {
+    ...state,
+    project: {
+      ...state.project,
+      exportTree: insertExportNodeAtDropTarget(treeWithoutMovingNode, movingNode, target)
+    },
+    selectedExportNodeId: target.draggedNodeId,
+    message: `Moved export node "${movingNode.name}".`
+  };
+}
+
 export function collectExportedSourceLayerIds(exportTree: ExportNode[]): number[] {
   return [...new Set(flattenExportNodes(exportTree).flatMap((node) => node.sourceLayerIds))];
 }
@@ -390,6 +441,36 @@ function removeExportNodeFromTree(exportTree: ExportNode[], nodeId: string): Exp
       ...node,
       children: removeExportNodeFromTree(node.children, nodeId)
     }));
+}
+
+function insertExportNodeAtDropTarget(
+  exportTree: ExportNode[],
+  movingNode: ExportNode,
+  target: ExportNodeDropTarget
+): ExportNode[] {
+  return exportTree.flatMap((node) => {
+    if (node.id === target.targetNodeId) {
+      if (target.position === 'before') {
+        return [movingNode, node];
+      }
+
+      if (target.position === 'after') {
+        return [node, movingNode];
+      }
+
+      return [
+        {
+          ...node,
+          children: [...node.children, movingNode]
+        }
+      ];
+    }
+
+    return {
+      ...node,
+      children: insertExportNodeAtDropTarget(node.children, movingNode, target)
+    };
+  });
 }
 
 function removeExportNodesFromTree(exportTree: ExportNode[], nodeIds: Set<string>): ExportNode[] {

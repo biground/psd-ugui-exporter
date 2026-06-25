@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
+import exportTree from '../src/components/ExportTree.tsx?raw';
 import { createExportNodeFromSources } from '../src/domain/export-tree';
 import type { SourceLayer } from '../src/schemas/source';
 
@@ -88,5 +89,17 @@ describe('createExportNodeFromSources', () => {
     firstNode.list!.padding.top = 10;
 
     expect(secondNode.list!.padding.top).toBe(0);
+  });
+});
+
+describe('ExportTree component', () => {
+  test('uses a drag handle for arbitrary structure changes instead of up and down buttons', () => {
+    expect(exportTree).toContain('GripVertical');
+    expect(exportTree).toContain('draggable');
+    expect(exportTree).toContain('onDropNode');
+    expect(exportTree).not.toContain('ArrowUp');
+    expect(exportTree).not.toContain('ArrowDown');
+    expect(exportTree).not.toContain('Move up');
+    expect(exportTree).not.toContain('Move down');
   });
 });

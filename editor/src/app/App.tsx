@@ -36,7 +36,7 @@ import {
   createProjectFromSourceDocument,
   findExportNodeById,
   mergeSelectedExportNodes,
-  moveExportNode,
+  moveExportNodeToDropTarget,
   removeExportNode,
   selectSourceLayer,
   toggleExportNodeSelection,
@@ -302,10 +302,6 @@ export function App() {
     setState((current) => removeExportNode(current, nodeId));
   }
 
-  function moveSelectedExportNode(nodeId: string, direction: 'up' | 'down') {
-    setState((current) => moveExportNode(current, nodeId, direction));
-  }
-
   const canMergeNodes = state.project !== null && state.selectedExportNodeIds.length > 1;
   const project = state.project;
   const hasProject = project !== null;
@@ -462,7 +458,15 @@ export function App() {
                       selectedNodeId={state.selectedExportNodeId}
                       selectedNodeIds={state.selectedExportNodeIds}
                       onDeleteNode={deleteExportNode}
-                      onMoveNode={moveSelectedExportNode}
+                      onDropNode={(draggedNodeId, targetNodeId, position) =>
+                        setState((current) =>
+                          moveExportNodeToDropTarget(current, {
+                            draggedNodeId,
+                            targetNodeId,
+                            position
+                          })
+                        )
+                      }
                       onSelectNode={(nodeId) =>
                         setState((current) => ({ ...current, selectedExportNodeId: nodeId }))
                       }
@@ -897,7 +901,7 @@ h2 {
 }
 
 .export-tree-row {
-  grid-template-columns: 24px 18px auto minmax(0, 1fr) auto;
+  grid-template-columns: 24px 24px 18px auto minmax(0, 1fr) auto;
   gap: 6px;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -999,6 +1003,34 @@ h2 {
 .tree-row.selected {
   background: #dcecff;
   border-color: #7aa8e8;
+}
+
+.export-node-drag-handle {
+  color: #64748b;
+  cursor: grab;
+}
+
+.export-node-drag-handle:active {
+  cursor: grabbing;
+}
+
+.export-tree-row.dragging {
+  opacity: 0.52;
+}
+
+.export-tree-row.drop-before {
+  border-top-color: #2563eb;
+  box-shadow: inset 0 2px 0 #2563eb;
+}
+
+.export-tree-row.drop-inside {
+  border-color: #2563eb;
+  background: #dcecff;
+}
+
+.export-tree-row.drop-after {
+  border-bottom-color: #2563eb;
+  box-shadow: inset 0 -2px 0 #2563eb;
 }
 
 .tree-name {
