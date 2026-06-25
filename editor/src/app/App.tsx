@@ -33,11 +33,13 @@ import {
 } from './recent-files';
 import {
   addSourceLayerToExportTree,
+  canMergeSelectedExportNodes,
   collectExportedSourceLayerIds,
   createEmptyState,
   createProjectFromSourceDocument,
   findExportNodeById,
   findSourceLayersByIds,
+  getMergeCandidateExportNodeIds,
   mergeSelectedExportNodes,
   moveExportNodeToDropTarget,
   removeExportNode,
@@ -367,13 +369,8 @@ export function App() {
 
   const project = state.project;
   const hasProject = project !== null;
-  const canMergeNodes = project !== null && (
-    state.selectedExportNodeIds.length > 1
-    || (
-      state.selectedExportNodeIds.length === 1
-      && (findExportNodeById(project.exportTree, state.selectedExportNodeIds[0])?.children.length ?? 0) > 0
-    )
-  );
+  const mergeCandidateExportNodeCount = getMergeCandidateExportNodeIds(state).length;
+  const canMergeNodes = canMergeSelectedExportNodes(state);
 
   return (
     <>
@@ -616,7 +613,8 @@ export function App() {
               <aside className="right-panel">
                 <Inspector
                   node={selectedExportNode}
-                  selectedExportNodeCount={state.selectedExportNodeIds.length}
+                  selectedExportNodeCount={mergeCandidateExportNodeCount}
+                  canMergeSelectedExports={canMergeNodes}
                   scale9PreviewAsset={selectedScale9PreviewAsset}
                   onUpdateNode={updateSelectedExportNode}
                   onMergeSelectedExports={mergeSelectedExportNodesFromTree}

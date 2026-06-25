@@ -12,6 +12,7 @@ import { createAutoScale9Settings, createDefaultScale9Settings } from '../domain
 interface InspectorProps {
   node: ExportNode | null;
   selectedExportNodeCount: number;
+  canMergeSelectedExports: boolean;
   scale9PreviewAsset: Scale9PreviewAsset | null;
   onUpdateNode: (patch: Partial<ExportNode> | ((node: ExportNode) => ExportNode)) => void;
   onMergeSelectedExports: () => void;
@@ -30,6 +31,7 @@ type SelectChangeEvent = { target: HTMLSelectElement };
 export function Inspector({
   node,
   selectedExportNodeCount,
+  canMergeSelectedExports,
   scale9PreviewAsset,
   onUpdateNode,
   onMergeSelectedExports,
@@ -41,6 +43,7 @@ export function Inspector({
         <h2>Inspector</h2>
         <ExportSelectionActions
           selectedExportNodeCount={selectedExportNodeCount}
+          canMergeSelectedExports={canMergeSelectedExports}
           onMergeSelectedExports={onMergeSelectedExports}
         />
         <p>Select an export node to edit its export semantics.</p>
@@ -53,6 +56,7 @@ export function Inspector({
       <h2>Inspector</h2>
       <ExportSelectionActions
         selectedExportNodeCount={selectedExportNodeCount}
+        canMergeSelectedExports={canMergeSelectedExports}
         onMergeSelectedExports={onMergeSelectedExports}
       />
       <label className="field">
@@ -108,11 +112,13 @@ export function Inspector({
 
 interface ExportSelectionActionsProps {
   selectedExportNodeCount: number;
+  canMergeSelectedExports: boolean;
   onMergeSelectedExports: () => void;
 }
 
 function ExportSelectionActions({
   selectedExportNodeCount,
+  canMergeSelectedExports,
   onMergeSelectedExports
 }: ExportSelectionActionsProps) {
   if (selectedExportNodeCount === 0) {
@@ -128,7 +134,7 @@ function ExportSelectionActions({
       <button
         type="button"
         onClick={onMergeSelectedExports}
-        disabled={selectedExportNodeCount < 2}
+        disabled={!canMergeSelectedExports}
       >
         Merge Selected Nodes
       </button>

@@ -100,6 +100,27 @@ export function findExportNodeById(exportTree: ExportNode[], nodeId: string | nu
   return flattenExportNodes(exportTree).find((node) => node.id === nodeId) ?? null;
 }
 
+export function getMergeCandidateExportNodeIds(state: AppState): string[] {
+  if (state.selectedExportNodeIds.length > 0) {
+    return state.selectedExportNodeIds;
+  }
+
+  return state.selectedExportNodeId === null ? [] : [state.selectedExportNodeId];
+}
+
+export function canMergeSelectedExportNodes(state: AppState): boolean {
+  if (state.project === null) {
+    return false;
+  }
+
+  const selectedNodeIds = new Set(getMergeCandidateExportNodeIds(state));
+  const selectedNodes = flattenExportNodes(state.project.exportTree).filter((node) =>
+    selectedNodeIds.has(node.id)
+  );
+
+  return selectedNodes.length > 1 || (selectedNodes.length === 1 && selectedNodes[0]!.children.length > 0);
+}
+
 export function createProjectFromSourceDocument(sourceDocument: SourceDocumentInput): PSDUIProject {
   return {
     version: 1,
@@ -210,7 +231,7 @@ export function mergeSelectedExportNodes(
     };
   }
 
-  const selectedNodeIds = new Set(state.selectedExportNodeIds);
+  const selectedNodeIds = new Set(getMergeCandidateExportNodeIds(state));
   const selectedNodes = flattenExportNodes(state.project.exportTree).filter((node) =>
     selectedNodeIds.has(node.id)
   );
