@@ -85,4 +85,32 @@ describe('preview highlights', () => {
       }
     ]);
   });
+
+  test('does not highlight disabled export nodes or their descendants', () => {
+    const highlights = collectCanvasHighlights({
+      mode: 'export',
+      sourceTree: [{ ...baseLayer, id: 1, name: 'Button Bg' }],
+      exportTree: [
+        {
+          ...baseExportNode,
+          id: 'source_1',
+          name: 'Disabled Button',
+          enabled: false,
+          children: [
+            {
+              ...baseExportNode,
+              id: 'source_2',
+              name: 'Disabled Child',
+              sourceLayerIds: [2]
+            }
+          ]
+        }
+      ],
+      selectedSourceLayerIds: [],
+      selectedExportNodeId: 'source_2',
+      hiddenSourceLayerIds: []
+    });
+
+    expect(highlights).toEqual([]);
+  });
 });

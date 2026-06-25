@@ -373,6 +373,12 @@ export function collectExportedSourceLayerIds(exportTree: ExportNode[]): number[
   return [...new Set(flattenExportNodes(exportTree).flatMap((node) => node.sourceLayerIds))];
 }
 
+export function collectPreviewExportedSourceLayerIds(exportTree: ExportNode[]): number[] {
+  return [
+    ...new Set(exportTree.flatMap((node) => collectEnabledExportNodeSourceLayerIds(node, true)))
+  ];
+}
+
 function collectSourceLayerAndDescendantIds(sourceTree: SourceLayer[], layerId: number): number[] {
   for (const layer of sourceTree) {
     if (layer.id === layerId) {
@@ -386,6 +392,22 @@ function collectSourceLayerAndDescendantIds(sourceTree: SourceLayer[], layerId: 
   }
 
   return [];
+}
+
+function collectEnabledExportNodeSourceLayerIds(
+  node: ExportNode,
+  ancestorsEnabled: boolean
+): number[] {
+  const isEnabled = ancestorsEnabled && node.enabled;
+
+  if (!isEnabled) {
+    return [];
+  }
+
+  return [
+    ...node.sourceLayerIds,
+    ...node.children.flatMap((child) => collectEnabledExportNodeSourceLayerIds(child, isEnabled))
+  ];
 }
 
 function isSourceLayerAlreadyExported(exportTree: ExportNode[], layerId: number): boolean {

@@ -2,7 +2,7 @@ import { convertFileSrc } from '@tauri-apps/api/core';
 import { ZoomIn, ZoomOut } from 'lucide-react';
 import { useLayoutEffect, useRef, useState } from 'react';
 
-import { collectExportedSourceLayerIds } from '../app/state';
+import { collectPreviewExportedSourceLayerIds } from '../app/state';
 import {
   beginMiddleMousePan,
   calculateWheelZoom,
@@ -111,16 +111,16 @@ export function CanvasPreview({
 
   const documentWidth = Math.max(1, project.document.width);
   const documentHeight = Math.max(1, project.document.height);
-  const exportedSourceLayerIds = collectExportedSourceLayerIds(project.exportTree);
+  const previewExportedSourceLayerIds = collectPreviewExportedSourceLayerIds(project.exportTree);
   const imageLayers = collectVisiblePreviewImageLayers(
     project.sourceTree,
     hiddenSourceLayerIds,
-    previewMode === 'source' ? null : exportedSourceLayerIds
+    previewMode === 'source' ? null : previewExportedSourceLayerIds
   );
   const textLayers = collectVisiblePreviewTextLayers(
     project.sourceTree,
     hiddenSourceLayerIds,
-    previewMode === 'source' ? null : exportedSourceLayerIds
+    previewMode === 'source' ? null : previewExportedSourceLayerIds
   );
   const highlights = collectCanvasHighlights({
     mode: previewMode,

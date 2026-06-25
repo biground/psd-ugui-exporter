@@ -36,9 +36,9 @@ export function collectCanvasHighlights({
   }
 
   const hiddenIds = new Set(hiddenSourceLayerIds);
-  const selectedNode = flattenExportNodes(exportTree).find((node) => node.id === selectedExportNodeId);
+  const selectedNode = findVisibleExportNodeById(exportTree, selectedExportNodeId, hiddenIds, true);
 
-  if (selectedNode === undefined || !isExportNodePreviewVisible(selectedNode, hiddenIds)) {
+  if (selectedNode === null) {
     return [];
   }
 
@@ -90,13 +90,39 @@ function collectSourceHighlightsRecursive(
   });
 }
 
+function findVisibleExportNodeById(
+  exportTree: ExportNode[],
+  nodeId: string,
+  hiddenSourceLayerIds: Set<number>,
+  ancestorsEnabled: boolean
+): ExportNode | null {
+  for (const node of exportTree) {
+    const isVisible = ancestorsEnabled
+      && node.enabled
+      && isExportNodePreviewVisible(node, hiddenSourceLayerIds);
+
+    if (node.id === nodeId) {
+      return isVisible ? node : null;
+    }
+
+    const childMatch = findVisibleExportNodeById(
+      node.children,
+      nodeId,
+      hiddenSourceLayerIds,
+      isVisible
+    );
+
+    if (childMatch !== null) {
+      return childMatch;
+    }
+  }
+
+  return null;
+}
+
 function isExportNodePreviewVisible(node: ExportNode, hiddenSourceLayerIds: Set<number>): boolean {
   return (
     node.sourceLayerIds.length === 0
     || node.sourceLayerIds.some((sourceLayerId) => !hiddenSourceLayerIds.has(sourceLayerId))
   );
-}
-
-function flattenExportNodes(exportTree: ExportNode[]): ExportNode[] {
-  return exportTree.flatMap((node) => [node, ...flattenExportNodes(node.children)]);
 }

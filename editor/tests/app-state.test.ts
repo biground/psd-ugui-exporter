@@ -3,6 +3,7 @@ import { describe, expect, test } from 'vitest';
 import {
   addSourceLayerToExportTree,
   appendExportNode,
+  collectPreviewExportedSourceLayerIds,
   createEmptyState,
   createExportNodeForSources,
   createProjectFromSourceDocument,
@@ -44,6 +45,44 @@ describe('app state', () => {
     expect(first.selectedExportNodeIds).toEqual(['source_12']);
     expect(second.selectedExportNodeIds).toEqual(['source_12', 'source_13']);
     expect(third.selectedExportNodeIds).toEqual(['source_13']);
+  });
+
+  test('collects only enabled export source layer ids for export preview', () => {
+    const state = {
+      ...createEmptyState(),
+      project: createProjectFromSourceDocument({
+        version: 1 as const,
+        source: {
+          path: '/tmp/menu.psb',
+          fileName: 'menu.psb'
+        },
+        document: {
+          width: 320,
+          height: 180
+        },
+        sourceTree: [
+          { ...baseLayer, id: 1, name: 'Enabled' },
+          {
+            ...baseLayer,
+            id: 2,
+            name: 'Disabled Parent',
+            kind: 'group',
+            children: [
+              { ...baseLayer, id: 3, name: 'Disabled Child' }
+            ]
+          }
+        ],
+        assetsDir: 'layers'
+      })
+    };
+    const added = addSourceLayerToExportTree(addSourceLayerToExportTree(state, 1), 2);
+    const disabledParent = {
+      ...added.project!.exportTree[1]!,
+      enabled: false
+    };
+    const exportTree = [added.project!.exportTree[0]!, disabledParent];
+
+    expect(collectPreviewExportedSourceLayerIds(exportTree)).toEqual([1]);
   });
 
   test('toggles source layer preview visibility recursively without changing source metadata', () => {
