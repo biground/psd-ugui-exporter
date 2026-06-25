@@ -251,10 +251,11 @@ export function mergeSelectedExportNodes(
     ...state,
     project: {
       ...state.project,
-      exportTree: [
-        ...removeExportNodesFromTree(state.project.exportTree, selectedNodeIds),
+      exportTree: replaceExportNodesWithMergedNode(
+        state.project.exportTree,
+        selectedNodeIds,
         mergedNode
-      ]
+      )
     },
     selectedExportNodeId: mergedNode.id,
     selectedExportNodeIds: [],
@@ -518,13 +519,32 @@ function insertExportNodeAtDropTarget(
   });
 }
 
-function removeExportNodesFromTree(exportTree: ExportNode[], nodeIds: Set<string>): ExportNode[] {
-  return exportTree
-    .filter((node) => !nodeIds.has(node.id))
-    .map((node) => ({
-      ...node,
-      children: removeExportNodesFromTree(node.children, nodeIds)
-    }));
+function replaceExportNodesWithMergedNode(
+  exportTree: ExportNode[],
+  nodeIds: Set<string>,
+  mergedNode: ExportNode
+): ExportNode[] {
+  let inserted = false;
+
+  function visit(nodes: ExportNode[]): ExportNode[] {
+    return nodes.flatMap((node) => {
+      if (nodeIds.has(node.id)) {
+        if (inserted) {
+          return [];
+        }
+
+        inserted = true;
+        return [mergedNode];
+      }
+
+      return {
+        ...node,
+        children: visit(node.children)
+      };
+    });
+  }
+
+  return visit(exportTree);
 }
 
 function replaceExportNodeWithNodes(

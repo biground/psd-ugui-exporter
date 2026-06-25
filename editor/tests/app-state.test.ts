@@ -14,7 +14,8 @@ import {
   selectSourceLayer,
   toggleExportNodeSelection,
   toggleSourceLayerPreviewVisibility,
-  unmergeExportNode
+  unmergeExportNode,
+  type AppState
 } from '../src/app/state';
 import type { SourceLayer } from '../src/schemas/source';
 
@@ -512,6 +513,83 @@ describe('app state', () => {
           }
         ]
       }
+    ]);
+  });
+
+  test('keeps merged export nodes at their original tree position', () => {
+    const state = {
+      ...createEmptyState(),
+      selectedExportNodeIds: ['source_2', 'source_3'],
+      project: {
+        version: 1 as const,
+        source: {
+          path: '/tmp/menu.psb',
+          fileName: 'menu.psb'
+        },
+        document: {
+          width: 320,
+          height: 180
+        },
+        sourceTree: [],
+        exportTree: [
+          {
+            id: 'root',
+            name: 'Root',
+            exportKind: 'VGLayout',
+            enabled: true,
+            sourceLayerIds: [],
+            rect: { x: 0, y: 0, width: 100, height: 100 },
+            rasterBounds: null,
+            list: null,
+            children: [
+              {
+                id: 'source_1',
+                name: 'A',
+                exportKind: 'image',
+                enabled: true,
+                sourceLayerIds: [1],
+                rect: { x: 0, y: 0, width: 10, height: 10 },
+                rasterBounds: { x: 0, y: 0, width: 10, height: 10 },
+                list: null,
+                children: []
+              },
+              {
+                id: 'source_2',
+                name: 'B',
+                exportKind: 'image',
+                enabled: true,
+                sourceLayerIds: [2],
+                rect: { x: 10, y: 0, width: 10, height: 10 },
+                rasterBounds: { x: 10, y: 0, width: 10, height: 10 },
+                list: null,
+                children: []
+              },
+              {
+                id: 'source_3',
+                name: 'C',
+                exportKind: 'text',
+                enabled: true,
+                sourceLayerIds: [3],
+                rect: { x: 20, y: 0, width: 10, height: 10 },
+                rasterBounds: null,
+                list: null,
+                children: []
+              }
+            ]
+          }
+        ],
+        cache: {
+          assetsDir: 'layers'
+        }
+      }
+    } satisfies AppState;
+
+    const merged = mergeSelectedExportNodes(state, 'merged_button', 'button');
+
+    expect(merged.project?.exportTree.map((node) => node.id)).toEqual(['root']);
+    expect(merged.project?.exportTree[0]?.children.map((node) => node.id)).toEqual([
+      'source_1',
+      'merged_button'
     ]);
   });
 
