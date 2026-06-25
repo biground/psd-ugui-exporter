@@ -9,6 +9,7 @@ import { Inspector } from '../components/Inspector';
 import { SourceTree } from '../components/SourceTree';
 import { createLayoutExportPackage } from '../domain/layout-export';
 import { resolveLayerImagePath } from '../domain/preview-assets';
+import { createEditorLayoutStore } from './editor-layout';
 import {
   defaultWorkspacePanelWidths,
   defaultTreePanelWidths,
@@ -75,6 +76,8 @@ type WorkspacePanelResizePointerEvent = {
 
 export function App() {
   const recentFilesStore = useMemo(() => createRecentFilesStore(window.localStorage), []);
+  const editorLayoutStore = useMemo(() => createEditorLayoutStore(window.localStorage), []);
+  const initialEditorLayout = useMemo(() => editorLayoutStore.load(), [editorLayoutStore]);
   const [state, setState] = useState(createEmptyState);
   const [projectSettings, setProjectSettings] = useState<ProjectSettings>({
     projectPath: '',
@@ -82,10 +85,12 @@ export function App() {
   });
   const [projectSettingsOpen, setProjectSettingsOpen] = useState(false);
   const [newExportKind, setNewExportKind] = useState<ExportKind>('image');
-  const [treePanelWidths, setTreePanelWidths] = useState<TreePanelWidths>(defaultTreePanelWidths);
+  const [treePanelWidths, setTreePanelWidths] = useState<TreePanelWidths>(
+    initialEditorLayout.treePanelWidths
+  );
   const [isTreePanelResizing, setTreePanelResizing] = useState(false);
   const [workspacePanelWidths, setWorkspacePanelWidths] = useState<WorkspacePanelWidths>(
-    defaultWorkspacePanelWidths
+    initialEditorLayout.workspacePanelWidths
   );
   const [isWorkspacePanelResizing, setWorkspacePanelResizing] = useState(false);
 
@@ -335,6 +340,31 @@ export function App() {
     setState((current) => removeExportNode(current, nodeId));
   }
 
+  function saveEditorLayout(
+    nextTreePanelWidths: TreePanelWidths,
+    nextWorkspacePanelWidths: WorkspacePanelWidths
+  ) {
+    editorLayoutStore.save({
+      version: 1,
+      treePanelWidths: nextTreePanelWidths,
+      workspacePanelWidths: nextWorkspacePanelWidths
+    });
+  }
+
+  function updateTreePanelWidths(nextTreePanelWidths: TreePanelWidths) {
+    setTreePanelWidths(nextTreePanelWidths);
+    saveEditorLayout(nextTreePanelWidths, workspacePanelWidths);
+  }
+
+  function updateWorkspacePanelWidths(
+    nextWorkspacePanelWidths: WorkspacePanelWidths,
+    nextTreePanelWidths: TreePanelWidths
+  ) {
+    setWorkspacePanelWidths(nextWorkspacePanelWidths);
+    setTreePanelWidths(nextTreePanelWidths);
+    saveEditorLayout(nextTreePanelWidths, nextWorkspacePanelWidths);
+  }
+
   const project = state.project;
   const hasProject = project !== null;
   const canMergeNodes = project !== null && (
@@ -470,7 +500,7 @@ export function App() {
 
                     event.preventDefault();
                     const bounds = event.currentTarget.parentElement.getBoundingClientRect();
-                    setTreePanelWidths((current) =>
+                    updateTreePanelWidths(
                       resizeTreePanelsFromPointer({
                         containerLeft: bounds.left,
                         pointerX: event.clientX,
@@ -558,15 +588,13 @@ export function App() {
                     pointerX: event.clientX,
                     totalWidth: treeBounds.width + previewBounds.width
                   });
+                  const nextTreePanelWidths = resizeTreePanelsFromPointer({
+                    containerLeft: 0,
+                    pointerX: treePanelWidths.sourceWidth,
+                    totalWidth: nextWorkspaceWidths.treeWidth - 8
+                  });
 
-                  setWorkspacePanelWidths(nextWorkspaceWidths);
-                  setTreePanelWidths((current) =>
-                    resizeTreePanelsFromPointer({
-                      containerLeft: 0,
-                      pointerX: current.sourceWidth,
-                      totalWidth: nextWorkspaceWidths.treeWidth - 8
-                    })
-                  );
+                  updateWorkspacePanelWidths(nextWorkspaceWidths, nextTreePanelWidths);
                 }}
                 onPointerUp={(event: WorkspacePanelResizePointerEvent) => {
                   if (!isWorkspacePanelResizing) {

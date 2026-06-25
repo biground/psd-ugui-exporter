@@ -51,6 +51,9 @@ describe('tree panel resize handle', () => {
     expect(app).toContain('Resize Source Tree and Export Tree panels');
     expect(app).toContain('--source-tree-panel-width');
     expect(app).toContain('--export-tree-panel-width');
+    expect(app).toContain('createEditorLayoutStore(window.localStorage)');
+    expect(app).toContain('initialEditorLayout.treePanelWidths');
+    expect(app).toContain('updateTreePanelWidths(');
   });
 });
 
@@ -101,6 +104,7 @@ describe('workspace panel resize handle', () => {
     expect(app).toContain('--tree-panel-group-width');
     expect(app).toContain('--preview-panel-width');
     expect(app).toContain('totalWidth: workspacePanelWidths.treeWidth - 8');
-    expect(app).toContain('setTreePanelWidths((current) =>');
+    expect(app).toContain('initialEditorLayout.workspacePanelWidths');
+    expect(app).toContain('updateWorkspacePanelWidths(');
   });
 });
