@@ -698,14 +698,14 @@ h2 {
 }
 
 .source-tree-row {
-  grid-template-columns: 26px minmax(0, 1fr) 26px;
+  grid-template-columns: 24px 26px minmax(0, 1fr) 26px;
   gap: 6px;
   border: 1px solid transparent;
   border-radius: 6px;
 }
 
 .export-tree-row {
-  grid-template-columns: 18px auto minmax(0, 1fr) auto;
+  grid-template-columns: 24px 18px auto minmax(0, 1fr) auto;
   gap: 6px;
   border: 1px solid transparent;
   border-radius: 6px;
@@ -746,6 +746,13 @@ h2 {
 .icon-button:hover {
   border-color: #c4ccd8;
   background: #ffffff;
+}
+
+.tree-collapse-spacer {
+  display: block;
+  width: 24px;
+  min-width: 24px;
+  height: 24px;
 }
 
 .layer-visibility-toggle.is-hidden {

@@ -1,5 +1,7 @@
-import { ArrowDown, ArrowUp, X } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowDown, ArrowUp, ChevronDown, ChevronRight, X } from 'lucide-react';
 
+import { isTreeNodeCollapsed, toggleCollapsedNodeId } from '../domain/tree-collapse';
 import type { ExportNode } from '../schemas/psdui';
 
 interface ExportTreeProps {
@@ -21,6 +23,8 @@ export function ExportTree({
   onSelectNode,
   onToggleNodeSelection
 }: ExportTreeProps) {
+  const [collapsedNodeIds, setCollapsedNodeIds] = useState<string[]>([]);
+
   if (nodes.length === 0) {
     return <p className="empty-state">No export nodes yet.</p>;
   }
@@ -40,6 +44,10 @@ export function ExportTree({
           onMoveNode={onMoveNode}
           onSelectNode={onSelectNode}
           onToggleNodeSelection={onToggleNodeSelection}
+          collapsedNodeIds={collapsedNodeIds}
+          onToggleNodeCollapse={(nodeId) =>
+            setCollapsedNodeIds((current) => toggleCollapsedNodeId(current, nodeId))
+          }
         />
       ))}
     </div>
@@ -51,6 +59,8 @@ interface ExportNodeRowProps extends Omit<ExportTreeProps, 'nodes'> {
   depth: number;
   siblingIndex: number;
   siblingCount: number;
+  collapsedNodeIds: string[];
+  onToggleNodeCollapse: (nodeId: string) => void;
 }
 
 function ExportNodeRow({
@@ -63,17 +73,38 @@ function ExportNodeRow({
   onDeleteNode,
   onMoveNode,
   onSelectNode,
-  onToggleNodeSelection
+  onToggleNodeSelection,
+  collapsedNodeIds,
+  onToggleNodeCollapse
 }: ExportNodeRowProps) {
   const isSelected = selectedNodeId === node.id;
   const isChecked = selectedNodeIds.includes(node.id);
+  const hasChildren = node.children.length > 0;
+  const isCollapsed = isTreeNodeCollapsed(collapsedNodeIds, node.id);
 
   return (
-    <div role="treeitem" aria-selected={isSelected}>
+    <div role="treeitem" aria-selected={isSelected} aria-expanded={hasChildren ? !isCollapsed : undefined}>
       <div
         className={`tree-row export-tree-row ${isSelected ? 'selected' : ''}`}
         style={{ paddingLeft: `${12 + depth * 14}px` }}
       >
+        {hasChildren ? (
+          <button
+            type="button"
+            className="icon-button tree-collapse-toggle"
+            aria-label={`Toggle ${node.name}`}
+            title={isCollapsed ? 'Expand' : 'Collapse'}
+            onClick={() => onToggleNodeCollapse(node.id)}
+          >
+            {isCollapsed ? (
+              <ChevronRight aria-hidden="true" className="button-icon" size={15} />
+            ) : (
+              <ChevronDown aria-hidden="true" className="button-icon" size={15} />
+            )}
+          </button>
+        ) : (
+          <span className="tree-collapse-spacer" aria-hidden="true" />
+        )}
         <input
           type="checkbox"
           className="node-selection-checkbox"
@@ -118,7 +149,7 @@ function ExportNodeRow({
           </button>
         </div>
       </div>
-      {node.children.map((child, index) => (
+      {isCollapsed ? null : node.children.map((child, index) => (
         <ExportNodeRow
           key={child.id}
           node={child}
@@ -131,6 +162,8 @@ function ExportNodeRow({
           onMoveNode={onMoveNode}
           onSelectNode={onSelectNode}
           onToggleNodeSelection={onToggleNodeSelection}
+          collapsedNodeIds={collapsedNodeIds}
+          onToggleNodeCollapse={onToggleNodeCollapse}
         />
       ))}
     </div>

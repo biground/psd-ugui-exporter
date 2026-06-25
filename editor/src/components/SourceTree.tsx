@@ -1,5 +1,7 @@
-import { ArrowRight, Eye, EyeOff } from 'lucide-react';
+import { useState } from 'react';
+import { ArrowRight, ChevronDown, ChevronRight, Eye, EyeOff } from 'lucide-react';
 
+import { isTreeNodeCollapsed, toggleCollapsedNodeId } from '../domain/tree-collapse';
 import type { SourceLayer } from '../schemas/source';
 
 interface SourceTreeProps {
@@ -21,6 +23,8 @@ export function SourceTree({
   onAddLayerToExportTree,
   onToggleLayerVisibility
 }: SourceTreeProps) {
+  const [collapsedLayerIds, setCollapsedLayerIds] = useState<string[]>([]);
+
   if (layers.length === 0) {
     return <p className="empty-state">No source layers loaded.</p>;
   }
@@ -38,6 +42,10 @@ export function SourceTree({
           onSelectLayer={onSelectLayer}
           onAddLayerToExportTree={onAddLayerToExportTree}
           onToggleLayerVisibility={onToggleLayerVisibility}
+          collapsedLayerIds={collapsedLayerIds}
+          onToggleLayerCollapse={(layerId) =>
+            setCollapsedLayerIds((current) => toggleCollapsedNodeId(current, String(layerId)))
+          }
         />
       ))}
     </div>
@@ -47,6 +55,8 @@ export function SourceTree({
 interface SourceLayerRowProps extends Omit<SourceTreeProps, 'layers'> {
   layer: SourceLayer;
   depth: number;
+  collapsedLayerIds: string[];
+  onToggleLayerCollapse: (layerId: number) => void;
 }
 
 function SourceLayerRow({
@@ -57,18 +67,39 @@ function SourceLayerRow({
   exportedSourceLayerIds,
   onSelectLayer,
   onAddLayerToExportTree,
-  onToggleLayerVisibility
+  onToggleLayerVisibility,
+  collapsedLayerIds,
+  onToggleLayerCollapse
 }: SourceLayerRowProps) {
   const isSelected = selectedLayerIds.includes(layer.id);
   const isPreviewVisible = layer.visible && !hiddenLayerIds.includes(layer.id);
   const hasExportedSourceInSubtree = containsExportedSourceLayer(layer, exportedSourceLayerIds);
+  const hasChildren = layer.children.length > 0;
+  const isCollapsed = isTreeNodeCollapsed(collapsedLayerIds, String(layer.id));
 
   return (
-    <div role="treeitem" aria-selected={isSelected}>
+    <div role="treeitem" aria-selected={isSelected} aria-expanded={hasChildren ? !isCollapsed : undefined}>
       <div
         className={`tree-row source-tree-row ${isSelected ? 'selected' : ''}`}
         style={{ paddingLeft: `${12 + depth * 14}px` }}
       >
+        {hasChildren ? (
+          <button
+            type="button"
+            className="icon-button tree-collapse-toggle"
+            aria-label={`Toggle ${layer.name}`}
+            title={isCollapsed ? 'Expand' : 'Collapse'}
+            onClick={() => onToggleLayerCollapse(layer.id)}
+          >
+            {isCollapsed ? (
+              <ChevronRight aria-hidden="true" className="button-icon" size={15} />
+            ) : (
+              <ChevronDown aria-hidden="true" className="button-icon" size={15} />
+            )}
+          </button>
+        ) : (
+          <span className="tree-collapse-spacer" aria-hidden="true" />
+        )}
         <button
           type="button"
           className={`icon-button layer-visibility-toggle ${isPreviewVisible ? 'is-visible' : 'is-hidden'}`}
@@ -97,7 +128,7 @@ function SourceLayerRow({
           <ArrowRight aria-hidden="true" className="button-icon" size={15} />
         </button>
       </div>
-      {layer.children.map((child) => (
+      {isCollapsed ? null : layer.children.map((child) => (
         <SourceLayerRow
           key={child.id}
           layer={child}
@@ -108,6 +139,8 @@ function SourceLayerRow({
           onSelectLayer={onSelectLayer}
           onAddLayerToExportTree={onAddLayerToExportTree}
           onToggleLayerVisibility={onToggleLayerVisibility}
+          collapsedLayerIds={collapsedLayerIds}
+          onToggleLayerCollapse={onToggleLayerCollapse}
         />
       ))}
     </div>
