@@ -7,6 +7,7 @@ import { CanvasPreview } from '../components/CanvasPreview';
 import { ExportTree } from '../components/ExportTree';
 import { Inspector } from '../components/Inspector';
 import { SourceTree } from '../components/SourceTree';
+import { createProjectAutoSaveScheduler } from './auto-save';
 import { createLayoutExportPackage } from '../domain/layout-export';
 import { resolveLayerImagePath } from '../domain/preview-assets';
 import { createEditorLayoutStore } from './editor-layout';
@@ -79,6 +80,26 @@ type WorkspacePanelResizePointerEvent = {
 export function App() {
   const recentFilesStore = useMemo(() => createRecentFilesStore(window.localStorage), []);
   const editorLayoutStore = useMemo(() => createEditorLayoutStore(window.localStorage), []);
+  const autoSaveScheduler = useMemo(
+    () =>
+      createProjectAutoSaveScheduler({
+        delayMs: 800,
+        saveProject: async ({ projectPath, project }) => {
+          await invoke('save_project', { projectPath, project });
+        },
+        onSaved: ({ projectPath, project }) => {
+          recordRecentProject(recentFilesStore, projectPath, project.source.path);
+          setState((current) => ({ ...current, message: `Auto-saved ${projectPath}.` }));
+        },
+        onError: (error) => {
+          setState((current) => ({
+            ...current,
+            message: `Auto-save failed: ${formatError(error)}`
+          }));
+        }
+      }),
+    [recentFilesStore]
+  );
   const initialEditorLayout = useMemo(() => editorLayoutStore.load(), [editorLayoutStore]);
   const [state, setState] = useState(createEmptyState);
   const [projectSettings, setProjectSettings] = useState<ProjectSettings>({
@@ -142,6 +163,20 @@ export function App() {
   useEffect(() => {
     void restoreRecentFile();
   }, []);
+
+  useEffect(() => {
+    const project = state.project;
+    const projectPath = projectSettings.projectPath.trim();
+
+    if (project === null || projectPath.length === 0) {
+      autoSaveScheduler.cancel();
+      return;
+    }
+
+    autoSaveScheduler.schedule({ projectPath, project });
+
+    return () => autoSaveScheduler.cancel();
+  }, [autoSaveScheduler, projectSettings.projectPath, state.project]);
 
   async function runCommand(action: () => Promise<void>) {
     try {
