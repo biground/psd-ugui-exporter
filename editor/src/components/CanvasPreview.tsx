@@ -21,6 +21,11 @@ import {
   projectPreviewFontFamily,
   projectPreviewFontPath
 } from '../domain/preview-text-style';
+import {
+  resolvePreviewTextAlign,
+  resolvePreviewTextStroke,
+  resolvePreviewTextVerticalJustify
+} from '../domain/preview-text-rendering';
 import type { PSDUIProject } from '../schemas/psdui';
 import type { Rect, SourceLayer, SourceText } from '../schemas/source';
 
@@ -301,16 +306,17 @@ export function CanvasPreview({
                   fontFamily: resolveTextFontFamily(text),
                   fontSize: `${fontSize}px`,
                   opacity: layer.opacity,
-                  textAlign: resolveTextAlign(text),
+                  textAlign: resolvePreviewTextAlign(text),
                   lineHeight,
-                  justifyContent: resolveTextVerticalJustify(text),
+                  justifyContent: resolvePreviewTextVerticalJustify(text),
                   whiteSpace: wrapsText ? 'pre-wrap' : 'pre',
-                  overflow: wrapsText ? 'hidden' : 'visible'
+                  overflow: wrapsText ? 'hidden' : 'visible',
+                  ...resolvePreviewTextStroke(text, effectiveZoom)
                 }}
                 title={layer.name}
                 aria-label={`${layer.name} text preview`}
               >
-                {normalizePhotoshopText(value)}
+                <span className="canvas-text-content">{normalizePhotoshopText(value)}</span>
               </div>
             );
           })}
@@ -373,30 +379,6 @@ function resolveTextColor(text: SourceText | null): string {
 
 function resolveTextFontFamily(text: SourceText | null): string {
   return createPreviewFontFamily(text?.fontName);
-}
-
-function resolveTextAlign(text: SourceText | null): 'left' | 'right' | 'center' | 'justify' {
-  const name = text?.paragraph?.horizontalAlign?.name ?? text?.alignment?.name ?? null;
-
-  if (name === 'right' || name === 'center' || name === 'justify') {
-    return name;
-  }
-
-  return 'left';
-}
-
-function resolveTextVerticalJustify(text: SourceText | null): 'flex-start' | 'center' | 'flex-end' {
-  const name = text?.paragraph?.verticalAlign?.name ?? null;
-
-  if (name === 'middle') {
-    return 'center';
-  }
-
-  if (name === 'bottom') {
-    return 'flex-end';
-  }
-
-  return 'flex-start';
 }
 
 function shouldWrapText(text: SourceText | null): boolean {

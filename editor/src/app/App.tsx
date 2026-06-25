@@ -1065,6 +1065,11 @@ h2 {
   user-select: none;
 }
 
+.canvas-text-content {
+  display: block;
+  width: 100%;
+}
+
 .canvas-highlight {
   position: absolute;
   display: block;
