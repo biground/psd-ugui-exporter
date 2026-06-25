@@ -59,7 +59,7 @@ def convert_layer(layer, assets_dir, assets_dir_name, state):
     children = [convert_layer(child, assets_dir, assets_dir_name, state) for child in layer] if is_group else []
     source_bounds = read_bounds(layer)
     raster_bounds = dict(source_bounds)
-    text = read_text(layer)
+    text = read_text(layer, source_bounds)
     kind = resolve_layer_kind(layer, text, is_group)
     image = None
 
@@ -119,7 +119,7 @@ def read_bounds(layer):
     }
 
 
-def read_text(layer):
+def read_text(layer, source_bounds):
     if getattr(layer, "kind", None) != "type":
         return None
 
@@ -129,15 +129,20 @@ def read_text(layer):
 
     style_runs = read_style_runs(layer, value)
     primary_run = style_runs[0] if style_runs else {}
+    paragraph = read_paragraph(layer)
+    alignment = paragraph.get("horizontalAlign") if paragraph is not None else read_alignment(layer)
     return {
         "value": value,
         "fontName": primary_run.get("fontName"),
         "fontSize": primary_run.get("fontSize"),
         "color": primary_run.get("color"),
         "tracking": primary_run.get("tracking"),
-        "alignment": read_alignment(layer),
+        "lineHeight": primary_run.get("leading"),
+        "alignment": alignment,
+        "paragraph": paragraph,
+        "box": read_text_box(layer, source_bounds),
         "runs": style_runs,
-        "stroke": read_stroke(layer),
+        "stroke": read_text_stroke(layer, primary_run),
     }
 
 
@@ -164,6 +169,13 @@ def read_style_runs(layer, value):
             "fontSize": read_number(style_data.get("FontSize")),
             "color": read_engine_color(style_data.get("FillColor")),
             "tracking": read_number(style_data.get("Tracking")),
+            "leading": read_number(style_data.get("Leading")),
+            "autoLeading": read_bool(style_data.get("AutoLeading")),
+            "horizontalScale": read_number(style_data.get("HorizontalScale")),
+            "verticalScale": read_number(style_data.get("VerticalScale")),
+            "baselineShift": read_number(style_data.get("BaselineShift")),
+            "strokeColor": read_engine_color(style_data.get("StrokeColor")),
+            "strokeWidth": read_number(style_data.get("StrokeWidth")),
         })
         cursor += length
 
@@ -181,12 +193,45 @@ def read_font_name(font_set, font_index):
 
 
 def read_alignment(layer):
+    properties = read_first_paragraph_properties(layer)
+    if properties is None:
+        return None
+    return read_horizontal_alignment(properties)
+
+
+def read_paragraph(layer):
+    properties = read_first_paragraph_properties(layer)
+    if properties is None:
+        return None
+
+    return {
+        "horizontalAlign": read_horizontal_alignment(properties),
+        "verticalAlign": read_vertical_alignment(properties),
+        "firstLineIndent": read_number(properties.get("FirstLineIndent")),
+        "startIndent": read_number(properties.get("StartIndent")),
+        "endIndent": read_number(properties.get("EndIndent")),
+        "spaceBefore": read_number(properties.get("SpaceBefore")),
+        "spaceAfter": read_number(properties.get("SpaceAfter")),
+        "autoHyphenate": read_bool(properties.get("AutoHyphenate")),
+        "wordSpacing": read_number_list(properties.get("WordSpacing")),
+        "letterSpacing": read_number_list(properties.get("LetterSpacing")),
+        "glyphSpacing": read_number_list(properties.get("GlyphSpacing")),
+        "autoLeading": read_number(properties.get("AutoLeading")),
+        "leadingType": read_integer(properties.get("LeadingType")),
+        "everyLineComposer": read_bool(properties.get("EveryLineComposer")),
+    }
+
+
+def read_first_paragraph_properties(layer):
     engine_dict = getattr(layer, "engine_dict", {}) or {}
     paragraph_run = engine_dict.get("ParagraphRun", {}) or {}
     run_array = paragraph_run.get("RunArray", []) or []
     if not run_array:
         return None
-    properties = ((run_array[0].get("ParagraphSheet", {}) or {}).get("Properties", {}) or {})
+    return ((run_array[0].get("ParagraphSheet", {}) or {}).get("Properties", {}) or {})
+
+
+def read_horizontal_alignment(properties):
     value = read_integer(properties.get("Justification"))
     names = {
         0: "left",
@@ -197,6 +242,90 @@ def read_alignment(layer):
     return {
         "value": value,
         "name": names.get(value, "unknown"),
+    }
+
+
+def read_vertical_alignment(properties):
+    raw_value = first_present(properties, ["VerticalAlignment", "VerticalJustification", "VAlignment"])
+    value = read_integer(raw_value)
+    if value is None:
+        value = 0
+    names = {
+        0: "top",
+        1: "middle",
+        2: "bottom",
+        3: "justify",
+    }
+    return {
+        "value": value,
+        "name": names.get(value, "unknown"),
+    }
+
+
+def read_text_box(layer, source_bounds):
+    kind = read_text_box_kind(layer)
+    transform = read_transform(layer)
+    engine_bounds = read_engine_text_box_bounds(layer, source_bounds)
+    bounds = engine_bounds if engine_bounds is not None else dict(source_bounds)
+
+    return {
+        "kind": kind,
+        "bounds": bounds,
+        "width": bounds["width"],
+        "height": bounds["height"],
+        "wrap": kind == "paragraph",
+        "transform": transform,
+        "source": "engineData" if engine_bounds is not None else "layerBounds",
+    }
+
+
+def read_text_box_kind(layer):
+    text_type = getattr(layer, "text_type", None)
+    text_type_name = str(text_type).lower() if text_type is not None else ""
+    if "paragraph" in text_type_name:
+        return "paragraph"
+    if "point" in text_type_name:
+        return "point"
+    return "unknown"
+
+
+def read_transform(layer):
+    transform = getattr(layer, "transform", None)
+    if transform is None:
+        return None
+    try:
+        values = [read_number(value) for value in transform]
+    except TypeError:
+        return None
+    return values if len(values) == 6 and all(value is not None for value in values) else None
+
+
+def read_engine_text_box_bounds(layer, source_bounds):
+    engine_dict = getattr(layer, "engine_dict", {}) or {}
+    match = find_first_keyed_value(engine_dict, {"BoxBounds", "TextBox", "TextBoxBounds"})
+    if match is None:
+        return None
+
+    key, values = match
+    numbers = read_number_list(values)
+    if numbers is None or len(numbers) < 4:
+        return None
+
+    if key == "BoxBounds":
+        top, left, bottom, right = numbers[:4]
+    else:
+        left, top, right, bottom = numbers[:4]
+
+    width = max(0, right - left)
+    height = max(0, bottom - top)
+    if width == 0 or height == 0:
+        return None
+
+    return {
+        "x": source_bounds["x"],
+        "y": source_bounds["y"],
+        "width": width,
+        "height": height,
     }
 
 
@@ -216,6 +345,27 @@ def read_stroke(layer):
             "color": read_effect_color(getattr(effect, "color", None)),
         }
     return None
+
+
+def read_text_stroke(layer, primary_run):
+    layer_stroke = read_stroke(layer)
+    if layer_stroke is not None:
+        layer_stroke["source"] = "layerEffect"
+        return layer_stroke
+
+    color = primary_run.get("strokeColor")
+    if color is None:
+        return None
+
+    return {
+        "source": "textStyle",
+        "enabled": True,
+        "size": primary_run.get("strokeWidth"),
+        "position": None,
+        "opacity": None,
+        "blendMode": None,
+        "color": color,
+    }
 
 
 def read_engine_color(color):
@@ -276,6 +426,60 @@ def read_integer(value):
         return int(value)
     except (TypeError, ValueError):
         return None
+
+
+def read_bool(value):
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    raw_value = getattr(value, "value", value)
+    if isinstance(raw_value, bool):
+        return raw_value
+    if isinstance(raw_value, (int, float)):
+        return raw_value != 0
+    if isinstance(raw_value, str):
+        normalized = raw_value.strip().lower()
+        if normalized in {"true", "1", "yes"}:
+            return True
+        if normalized in {"false", "0", "no"}:
+            return False
+    return None
+
+
+def read_number_list(value):
+    if value is None:
+        return None
+    try:
+        values = list(value)
+    except TypeError:
+        return None
+    numbers = [read_number(item) for item in values]
+    return numbers if all(item is not None for item in numbers) else None
+
+
+def first_present(dictionary, keys):
+    for key in keys:
+        if key in dictionary:
+            return dictionary.get(key)
+    return None
+
+
+def find_first_keyed_value(value, keys):
+    if hasattr(value, "items"):
+        for key, child in value.items():
+            key_name = str(key).strip("'")
+            if key_name in keys:
+                return key_name, child
+            match = find_first_keyed_value(child, keys)
+            if match is not None:
+                return match
+    elif isinstance(value, (list, tuple)):
+        for child in value:
+            match = find_first_keyed_value(child, keys)
+            if match is not None:
+                return match
+    return None
 
 
 def decode_bytes(value):

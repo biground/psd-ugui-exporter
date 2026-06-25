@@ -1,5 +1,5 @@
 import type { ExportKind, ListSettings } from './psdui';
-import type { Rect } from './source';
+import type { Rect, SourceText } from './source';
 
 export interface UILayoutNode {
   id: string;
@@ -8,6 +8,7 @@ export interface UILayoutNode {
   rect: Rect;
   rasterBounds: Rect | null;
   sourceLayerIds: number[];
+  text: SourceText | null;
   list: ListSettings | null;
   children: UILayoutNode[];
 }

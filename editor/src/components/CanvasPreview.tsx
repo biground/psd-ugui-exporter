@@ -22,7 +22,7 @@ import {
   projectPreviewFontPath
 } from '../domain/preview-text-style';
 import type { PSDUIProject } from '../schemas/psdui';
-import type { SourceText } from '../schemas/source';
+import type { Rect, SourceLayer, SourceText } from '../schemas/source';
 
 interface CanvasPreviewProps {
   project: PSDUIProject | null;
@@ -283,28 +283,34 @@ export function CanvasPreview({
           })}
           {textLayers.map(({ layer, value }) => {
             const text = layer.text;
-            const fontSize = resolveTextFontSize(text, layer.sourceBounds.height, effectiveZoom);
+            const textRect = resolveTextRect(layer);
+            const fontSize = resolveTextFontSize(text, textRect.height, effectiveZoom);
+            const lineHeight = resolveTextLineHeight(text, effectiveZoom);
+            const wrapsText = shouldWrapText(text);
 
             return (
               <div
                 key={layer.id}
                 className="canvas-text-layer"
                 style={{
-                  left: `${(layer.sourceBounds.x / documentWidth) * 100}%`,
-                  top: `${(layer.sourceBounds.y / documentHeight) * 100}%`,
-                  width: `${(layer.sourceBounds.width / documentWidth) * 100}%`,
-                  height: `${(layer.sourceBounds.height / documentHeight) * 100}%`,
+                  left: `${(textRect.x / documentWidth) * 100}%`,
+                  top: `${(textRect.y / documentHeight) * 100}%`,
+                  width: `${(textRect.width / documentWidth) * 100}%`,
+                  height: `${(textRect.height / documentHeight) * 100}%`,
                   color: resolveTextColor(text),
                   fontFamily: resolveTextFontFamily(text),
                   fontSize: `${fontSize}px`,
                   opacity: layer.opacity,
                   textAlign: resolveTextAlign(text),
-                  lineHeight: 1.1
+                  lineHeight,
+                  justifyContent: resolveTextVerticalJustify(text),
+                  whiteSpace: wrapsText ? 'pre-wrap' : 'pre',
+                  overflow: wrapsText ? 'hidden' : 'visible'
                 }}
                 title={layer.name}
                 aria-label={`${layer.name} text preview`}
               >
-                {value}
+                {normalizePhotoshopText(value)}
               </div>
             );
           })}
@@ -342,6 +348,14 @@ function resolveTextFontSize(text: SourceText | null, boundsHeight: number, zoom
   return Math.max(1, Math.round(size * zoom * 100) / 100);
 }
 
+function resolveTextLineHeight(text: SourceText | null, zoom: number): number | string {
+  if (typeof text?.lineHeight === 'number' && text.lineHeight > 0) {
+    return `${Math.round(text.lineHeight * zoom * 100) / 100}px`;
+  }
+
+  return 1.1;
+}
+
 function resolveTextColor(text: SourceText | null): string {
   const color = text?.color;
 
@@ -362,20 +376,54 @@ function resolveTextFontFamily(text: SourceText | null): string {
 }
 
 function resolveTextAlign(text: SourceText | null): 'left' | 'right' | 'center' | 'justify' {
-  const alignment = text?.alignment;
-  const name =
-    typeof alignment === 'object'
-      && alignment !== null
-      && 'name' in alignment
-      && typeof alignment.name === 'string'
-      ? alignment.name
-      : null;
+  const name = text?.paragraph?.horizontalAlign?.name ?? text?.alignment?.name ?? null;
 
   if (name === 'right' || name === 'center' || name === 'justify') {
     return name;
   }
 
   return 'left';
+}
+
+function resolveTextVerticalJustify(text: SourceText | null): 'flex-start' | 'center' | 'flex-end' {
+  const name = text?.paragraph?.verticalAlign?.name ?? null;
+
+  if (name === 'middle') {
+    return 'center';
+  }
+
+  if (name === 'bottom') {
+    return 'flex-end';
+  }
+
+  return 'flex-start';
+}
+
+function shouldWrapText(text: SourceText | null): boolean {
+  return text?.box?.wrap === true;
+}
+
+function resolveTextRect(layer: SourceLayer): Rect {
+  const bounds = layer.text?.box?.bounds;
+
+  if (
+    bounds !== undefined
+    && bounds !== null
+    && Number.isFinite(bounds.x)
+    && Number.isFinite(bounds.y)
+    && Number.isFinite(bounds.width)
+    && Number.isFinite(bounds.height)
+    && bounds.width > 0
+    && bounds.height > 0
+  ) {
+    return bounds;
+  }
+
+  return layer.sourceBounds;
+}
+
+function normalizePhotoshopText(value: string): string {
+  return value.replace(/\r/g, '\n');
 }
 
 interface CanvasPointerEvent {

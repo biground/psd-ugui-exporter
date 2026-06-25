@@ -54,6 +54,70 @@ function createRewardProject(): PSDUIProject {
   };
 }
 
+function createTextProject(): PSDUIProject {
+  return {
+    version: 1,
+    source: { path: '/fixtures/dialog.psd', fileName: 'dialog.psd' },
+    document: { width: 640, height: 360 },
+    sourceTree: [
+      {
+        id: 10,
+        name: 'Description',
+        kind: 'text',
+        visible: true,
+        opacity: 1,
+        blendMode: 'normal',
+        sourceBounds: { x: 40, y: 80, width: 280, height: 88 },
+        rasterBounds: { x: 40, y: 80, width: 280, height: 88 },
+        image: null,
+        text: {
+          value: 'Wrapped PSD text',
+          fontName: 'SourceHanSansCN-Heavy',
+          fontSize: 24,
+          color: { hex: '#665544' },
+          tracking: 0,
+          lineHeight: 32,
+          box: {
+            kind: 'paragraph',
+            bounds: { x: 40, y: 80, width: 280, height: 88 },
+            width: 280,
+            height: 88,
+            wrap: true,
+            transform: [1, 0, 0, 1, 40, 80],
+            source: 'layerBounds'
+          },
+          paragraph: {
+            horizontalAlign: { value: 2, name: 'center' },
+            verticalAlign: { value: 1, name: 'middle' },
+            startIndent: 0,
+            endIndent: 0,
+            spaceBefore: 0,
+            spaceAfter: 0
+          },
+          alignment: { value: 2, name: 'center' },
+          runs: [],
+          stroke: { source: 'textStyle', enabled: true, color: { hex: '#ff0000' }, size: null }
+        },
+        children: []
+      }
+    ],
+    exportTree: [
+      {
+        id: 'description',
+        name: 'Description',
+        exportKind: 'text',
+        enabled: true,
+        sourceLayerIds: [10],
+        rect: { x: 40, y: 80, width: 280, height: 88 },
+        rasterBounds: { x: 40, y: 80, width: 280, height: 88 },
+        list: null,
+        children: []
+      }
+    ],
+    cache: { assetsDir: '/fixtures/.psdui-cache' }
+  };
+}
+
 describe('createLayoutDocument', () => {
   test('exports enabled layout nodes and omits disabled subtrees', () => {
     const project = createRewardProject();
@@ -112,5 +176,24 @@ describe('createLayoutDocument', () => {
     expect(project.exportTree[0].sourceLayerIds).toEqual([1]);
     expect(project.document.width).toBe(320);
     expect(project.exportTree[0].rect.x).toBe(12);
+  });
+
+  test('exports text metadata for the first mapped source text layer', () => {
+    const project = createTextProject();
+
+    const layout = createLayoutDocument(project);
+    const text = layout.nodes[0].text;
+    const strokeColor = text?.stroke?.color as { hex: string } | undefined;
+
+    expect(text?.value).toBe('Wrapped PSD text');
+    expect(text?.box?.wrap).toBe(true);
+    expect(text?.box?.bounds.width).toBe(280);
+    expect(text?.paragraph?.horizontalAlign?.name).toBe('center');
+    expect(text?.paragraph?.verticalAlign?.name).toBe('middle');
+    expect(strokeColor?.hex).toBe('#ff0000');
+
+    text!.box!.bounds.width = 999;
+
+    expect(project.sourceTree[0].text!.box!.bounds.width).toBe(280);
   });
 });

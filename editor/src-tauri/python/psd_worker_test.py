@@ -91,6 +91,56 @@ class FakeTextLayer:
         return Image.new("RGBA", (120, 40), (255, 255, 255, 255))
 
 
+class FakeParagraphTextLayer(FakeTextLayer):
+    name = "Description"
+    bbox = (100, 200, 460, 296)
+    text = "Line wraps inside a Photoshop text box"
+    text_type = "paragraph"
+    transform = (1.0, 0.0, 0.0, 1.0, 100.0, 200.0)
+    effects = []
+    engine_dict = {
+        "ParagraphRun": {
+            "RunArray": [
+                {
+                    "ParagraphSheet": {
+                        "Properties": {
+                            "Justification": 0,
+                            "StartIndent": 4.0,
+                            "EndIndent": 6.0,
+                            "SpaceBefore": 2.0,
+                            "SpaceAfter": 3.0,
+                            "VerticalAlignment": 1,
+                        },
+                    },
+                },
+            ],
+        },
+        "StyleRun": {
+            "RunLengthArray": [39],
+            "RunArray": [
+                {
+                    "StyleSheet": {
+                        "StyleSheetData": {
+                            "Font": 0,
+                            "FontSize": 24.0,
+                            "Leading": 32.0,
+                            "AutoLeading": False,
+                            "FillColor": {
+                                "Type": 1,
+                                "Values": [1.0, 0.2, 0.3, 0.4],
+                            },
+                            "StrokeColor": {
+                                "Type": 1,
+                                "Values": [1.0, 1.0, 0.0, 0.0],
+                            },
+                        },
+                    },
+                },
+            ],
+        },
+    }
+
+
 class PsdWorkerTest(unittest.TestCase):
     def test_convert_layer_outputs_image_source_and_raster_bounds(self):
         with tempfile.TemporaryDirectory() as temp_dir:
@@ -132,6 +182,32 @@ class PsdWorkerTest(unittest.TestCase):
             self.assertEqual(layer["text"]["alignment"]["name"], "center")
             self.assertEqual(layer["text"]["stroke"]["size"], 3.0)
             self.assertEqual(list(assets_dir.glob("*.png")), [])
+
+    def test_convert_layer_outputs_paragraph_text_box_and_layout_metadata(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            assets_dir = Path(temp_dir) / "layers"
+            assets_dir.mkdir()
+            state = {"layer_index": 0, "used_asset_names": set()}
+
+            layer = psd_worker.convert_layer(
+                FakeParagraphTextLayer(),
+                assets_dir,
+                "layers",
+                state,
+            )
+
+            self.assertEqual(layer["kind"], "text")
+            self.assertEqual(layer["text"]["box"]["kind"], "paragraph")
+            self.assertEqual(layer["text"]["box"]["bounds"], {"x": 100, "y": 200, "width": 360, "height": 96})
+            self.assertEqual(layer["text"]["box"]["wrap"], True)
+            self.assertEqual(layer["text"]["box"]["transform"], [1.0, 0.0, 0.0, 1.0, 100.0, 200.0])
+            self.assertEqual(layer["text"]["paragraph"]["horizontalAlign"]["name"], "left")
+            self.assertEqual(layer["text"]["paragraph"]["verticalAlign"]["name"], "middle")
+            self.assertEqual(layer["text"]["paragraph"]["startIndent"], 4.0)
+            self.assertEqual(layer["text"]["lineHeight"], 32.0)
+            self.assertEqual(layer["text"]["runs"][0]["strokeColor"]["hex"], "#ff0000")
+            self.assertEqual(layer["text"]["stroke"]["source"], "textStyle")
+            self.assertEqual(layer["text"]["stroke"]["color"]["hex"], "#ff0000")
 
 
 if __name__ == "__main__":

@@ -951,9 +951,10 @@ h2 {
 
 .canvas-text-layer {
   position: absolute;
-  display: block;
-  overflow: visible;
-  white-space: pre;
+  display: flex;
+  flex-direction: column;
+  overflow-wrap: anywhere;
+  word-break: break-word;
   pointer-events: none;
   user-select: none;
 }
