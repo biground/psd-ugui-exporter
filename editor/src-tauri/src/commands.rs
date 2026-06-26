@@ -11,11 +11,15 @@ use crate::project_io::{read_json_file, write_json_file};
 use crate::python_worker::open_psd_with_worker;
 
 #[tauri::command]
-pub fn open_psd(source_path: String, cache_dir: Option<String>) -> Result<Value, String> {
+pub fn open_psd(
+    app: tauri::AppHandle,
+    source_path: String,
+    cache_dir: Option<String>,
+) -> Result<Value, String> {
     let source_path = PathBuf::from(source_path);
     let cache_dir = resolve_cache_dir(&source_path, cache_dir.as_deref());
 
-    open_psd_with_worker(source_path, cache_dir)
+    open_psd_with_worker(&app, source_path, cache_dir)
 }
 
 #[tauri::command]

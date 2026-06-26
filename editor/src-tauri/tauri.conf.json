@@ -37,7 +37,9 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "python/psd_worker.py"
+      "python/psd_worker.py",
+      "python-runtime",
+      "python-packages"
     ]
   }
 }

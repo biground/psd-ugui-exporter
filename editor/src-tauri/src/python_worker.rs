@@ -3,23 +3,40 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 use serde_json::Value;
+use tauri::{AppHandle, Manager};
 
 const WORKER_OUTPUT_LIMIT: usize = 2000;
 
-pub fn open_psd_with_worker(source_path: PathBuf, cache_dir: PathBuf) -> Result<Value, String> {
+pub fn open_psd_with_worker(
+    app: &AppHandle,
+    source_path: PathBuf,
+    cache_dir: PathBuf,
+) -> Result<Value, String> {
     let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let output = Command::new("python3")
-        .arg(worker_script_path())
+    let resource_dir = app.path().resource_dir().ok();
+    let runtime = resolve_worker_runtime(
+        manifest_dir,
+        resource_dir.as_deref(),
+        env::var("PYTHONPATH").ok().as_deref(),
+        env::var("PSDUI_EDITOR_PYTHON").ok().as_deref(),
+    );
+
+    let mut command = Command::new(&runtime.python_command);
+    command
+        .arg(&runtime.worker_script)
         .arg("--source")
         .arg(&source_path)
         .arg("--out")
         .arg(&cache_dir)
         .arg("--assets-dir")
         .arg("layers")
-        .env(
-            "PYTHONPATH",
-            resolve_python_path_env(env::var("PYTHONPATH").ok().as_deref(), manifest_dir),
-        )
+        .env("PYTHONPATH", &runtime.python_path);
+
+    if let Some(python_home) = &runtime.python_home {
+        command.env("PYTHONHOME", python_home);
+    }
+
+    let output = command
         .output()
         .map_err(|error| format!("Failed to start PSD worker: {error}"))?;
 
@@ -50,21 +67,98 @@ pub fn open_psd_with_worker(source_path: PathBuf, cache_dir: PathBuf) -> Result<
     Ok(payload)
 }
 
-fn worker_script_path() -> PathBuf {
-    // MVP commands run against the source-tree worker. `tauri.conf.json` declares the
-    // worker as a bundle resource; packaged resource lookup can be wired through
-    // AppHandle once commands accept app state.
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("python/psd_worker.py")
+struct WorkerRuntime {
+    python_command: PathBuf,
+    worker_script: PathBuf,
+    python_path: String,
+    python_home: Option<PathBuf>,
 }
 
-fn resolve_python_path_env(existing: Option<&str>, manifest_dir: &Path) -> String {
+fn resolve_worker_runtime(
+    manifest_dir: &Path,
+    resource_dir: Option<&Path>,
+    existing_python_path: Option<&str>,
+    python_override: Option<&str>,
+) -> WorkerRuntime {
+    let worker_script = worker_script_path(manifest_dir, resource_dir);
+    let python_runtime_dir = resolve_python_runtime_dir(resource_dir, python_override);
+    let python_command = resolve_python_command(resource_dir, python_override);
+    let python_path =
+        resolve_python_path_env(existing_python_path, manifest_dir, resource_dir);
+
+    WorkerRuntime {
+        python_command,
+        worker_script,
+        python_path,
+        python_home: python_runtime_dir,
+    }
+}
+
+fn worker_script_path(manifest_dir: &Path, resource_dir: Option<&Path>) -> PathBuf {
+    if let Some(worker_script) = resource_dir
+        .map(|resource_dir| resource_dir.join("python/psd_worker.py"))
+        .filter(|worker_script| worker_script.exists())
+    {
+        return worker_script;
+    }
+
+    manifest_dir.join("python/psd_worker.py")
+}
+
+fn resolve_python_command(resource_dir: Option<&Path>, python_override: Option<&str>) -> PathBuf {
+    if let Some(python_override) = python_override
+        .map(str::trim)
+        .filter(|python_override| !python_override.is_empty())
+    {
+        return PathBuf::from(python_override);
+    }
+
+    if let Some(python_command) = resource_dir
+        .map(|resource_dir| resource_dir.join("python-runtime/bin/python3"))
+        .filter(|python_command| python_command.exists())
+    {
+        return python_command;
+    }
+
+    PathBuf::from("python3")
+}
+
+fn resolve_python_runtime_dir(
+    resource_dir: Option<&Path>,
+    python_override: Option<&str>,
+) -> Option<PathBuf> {
+    if python_override
+        .map(str::trim)
+        .is_some_and(|python_override| !python_override.is_empty())
+    {
+        return None;
+    }
+
+    resource_dir
+        .map(|resource_dir| resource_dir.join("python-runtime"))
+        .filter(|python_runtime| python_runtime.join("bin/python3").exists())
+}
+
+fn resolve_python_path_env(
+    existing: Option<&str>,
+    manifest_dir: &Path,
+    resource_dir: Option<&Path>,
+) -> String {
     let repo_python = manifest_dir
         .parent()
         .and_then(Path::parent)
         .unwrap_or(manifest_dir)
         .join(".python");
 
-    let mut paths = vec![repo_python.clone()];
+    let mut paths = Vec::new();
+    if let Some(bundled_packages) = resource_dir
+        .map(|resource_dir| resource_dir.join("python-packages"))
+        .filter(|bundled_packages| bundled_packages.exists())
+    {
+        paths.push(bundled_packages);
+    }
+
+    paths.push(repo_python.clone());
     if let Some(existing) = existing.filter(|value| !value.is_empty()) {
         paths.extend(env::split_paths(existing));
     }
@@ -108,7 +202,7 @@ fn trim_and_truncate_output(output: &[u8]) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{resolve_python_path_env, worker_error_message};
+    use super::{resolve_python_path_env, resolve_worker_runtime, worker_error_message};
     use std::env;
     use std::path::Path;
 
@@ -118,7 +212,7 @@ mod tests {
         let existing = env::join_paths([Path::new("/custom/one"), Path::new("/custom/two")])
             .expect("join existing paths");
 
-        let python_path = resolve_python_path_env(existing.to_str(), manifest_dir);
+        let python_path = resolve_python_path_env(existing.to_str(), manifest_dir, None);
         let paths = env::split_paths(&python_path).collect::<Vec<_>>();
 
         assert_eq!(paths[0], Path::new("/repo/.python"));
@@ -138,5 +232,39 @@ mod tests {
         assert!(message.contains("stdout: stdout start"));
         assert!(message.contains("truncated"));
         assert!(message.len() < 5000);
+    }
+
+    #[test]
+    fn worker_runtime_prefers_bundled_resource_python_and_packages() {
+        let temp_dir = tempfile::tempdir().expect("temp dir");
+        let resource_dir = temp_dir.path();
+        let bundled_python = resource_dir.join("python-runtime/bin/python3");
+        let bundled_packages = resource_dir.join("python-packages");
+        let bundled_worker = resource_dir.join("python/psd_worker.py");
+
+        std::fs::create_dir_all(bundled_python.parent().expect("python parent"))
+            .expect("python dir");
+        std::fs::create_dir_all(&bundled_packages).expect("packages dir");
+        std::fs::create_dir_all(bundled_worker.parent().expect("worker parent"))
+            .expect("worker dir");
+        std::fs::write(&bundled_python, b"python").expect("python executable");
+        std::fs::write(&bundled_worker, b"worker").expect("worker script");
+
+        let manifest_dir = Path::new("/repo/editor/src-tauri");
+        let runtime = resolve_worker_runtime(
+            manifest_dir,
+            Some(resource_dir),
+            Some("/custom/pythonpath"),
+            None,
+        );
+
+        assert_eq!(runtime.python_command, bundled_python);
+        assert_eq!(runtime.worker_script, bundled_worker);
+        assert_eq!(runtime.python_home, Some(resource_dir.join("python-runtime")));
+
+        let paths = env::split_paths(&runtime.python_path).collect::<Vec<_>>();
+        assert_eq!(paths[0], bundled_packages);
+        assert_eq!(paths[1], Path::new("/repo/.python"));
+        assert_eq!(paths[2], Path::new("/custom/pythonpath"));
     }
 }

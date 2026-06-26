@@ -8,3 +8,5 @@ editor/src-tauri/target/
 psdexport/
 *_export/
 release
+editor/src-tauri/python-packages
+editor/src-tauri/python-runtime
