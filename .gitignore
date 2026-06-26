@@ -7,3 +7,4 @@ editor/src-tauri/layers/
 editor/src-tauri/target/
 psdexport/
 *_export/
+release

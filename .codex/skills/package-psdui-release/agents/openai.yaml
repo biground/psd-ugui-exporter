@@ -1,0 +1,4 @@
+interface:
+  display_name: "Package PSD UI Release"
+  short_description: "Build the PSD UGUI Tauri release app"
+  default_prompt: "Use $package-psdui-release to build and verify the PSD UGUI Exporter release package."
