@@ -16,6 +16,7 @@ export interface UILayoutNode {
   name: string;
   exportKind: ExportKind;
   rect: Rect;
+  anchor: { x: number; y: number } | null;
   rasterBounds: Rect | null;
   sourceLayerIds: number[];
   asset: UIImageAsset | null;

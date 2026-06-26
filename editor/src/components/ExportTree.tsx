@@ -12,9 +12,17 @@ interface ExportTreeProps {
   selectedNodeIds: string[];
   onDeleteNode: (nodeId: string) => void;
   onDropNode: (draggedNodeId: string, targetNodeId: string, position: ExportNodeDropPosition) => void;
-  onSelectNode: (nodeId: string) => void;
+  onRenameNode: (nodeId: string, name: string) => void;
+  onSelectNode: (nodeId: string, event: ExportTreeSelectEvent) => void;
   onToggleNodeEnabled: (nodeId: string) => void;
   onToggleNodeSelection: (nodeId: string) => void;
+}
+
+export interface ExportTreeSelectEvent {
+  shiftKey: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
+  orderedNodeIds: string[];
 }
 
 export function ExportTree({
@@ -23,6 +31,7 @@ export function ExportTree({
   selectedNodeIds,
   onDeleteNode,
   onDropNode,
+  onRenameNode,
   onSelectNode,
   onToggleNodeEnabled,
   onToggleNodeSelection
@@ -31,7 +40,9 @@ export function ExportTree({
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<string[]>([]);
   const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
   const [dragTarget, setDragTarget] = useState<ExportTreeDragTarget | null>(null);
+  const [renamingNodeId, setRenamingNodeId] = useState<string | null>(null);
   const dragTargetRef = useRef<ExportTreeDragTarget | null>(null);
+  const orderedNodeIds = collectVisibleExportNodeIds(nodes, collapsedNodeIds);
 
   useEffect(() => {
     if (draggedNodeId === null) {
@@ -98,10 +109,15 @@ export function ExportTree({
           selectedNodeIds={selectedNodeIds}
           onDeleteNode={onDeleteNode}
           onDragNodeStart={setDraggedNodeId}
+          onRenameNode={onRenameNode}
+          onRenameNodeStart={setRenamingNodeId}
           onSelectNode={onSelectNode}
           onToggleNodeEnabled={onToggleNodeEnabled}
           onToggleNodeSelection={onToggleNodeSelection}
           collapsedNodeIds={collapsedNodeIds}
+          orderedNodeIds={orderedNodeIds}
+          renamingNodeId={renamingNodeId}
+          onRenameNodeEnd={() => setRenamingNodeId(null)}
           onToggleNodeCollapse={(nodeId) =>
             setCollapsedNodeIds((current) => toggleCollapsedNodeId(current, nodeId))
           }
@@ -122,7 +138,11 @@ interface ExportNodeRowProps extends Omit<ExportTreeProps, 'nodes' | 'onDropNode
   draggedNodeId: string | null;
   dragTarget: ExportTreeDragTarget | null;
   onDragNodeStart: (nodeId: string) => void;
+  onRenameNodeStart: (nodeId: string) => void;
   collapsedNodeIds: string[];
+  orderedNodeIds: string[];
+  renamingNodeId: string | null;
+  onRenameNodeEnd: () => void;
   onToggleNodeCollapse: (nodeId: string) => void;
 }
 
@@ -135,17 +155,38 @@ function ExportNodeRow({
   selectedNodeIds,
   onDeleteNode,
   onDragNodeStart,
+  onRenameNode,
+  onRenameNodeStart,
   onSelectNode,
   onToggleNodeEnabled,
   onToggleNodeSelection,
   collapsedNodeIds,
+  orderedNodeIds,
+  renamingNodeId,
+  onRenameNodeEnd,
   onToggleNodeCollapse
 }: ExportNodeRowProps) {
-  const isSelected = selectedNodeId === node.id;
   const isChecked = selectedNodeIds.includes(node.id);
+  const isSelected = selectedNodeId === node.id || isChecked;
   const hasChildren = node.children.length > 0;
   const isCollapsed = isTreeNodeCollapsed(collapsedNodeIds, node.id);
   const dropPosition = dragTarget?.nodeId === node.id ? dragTarget.position : null;
+  const isRenaming = renamingNodeId === node.id;
+  const [draftName, setDraftName] = useState(node.name);
+
+  useEffect(() => {
+    if (isRenaming) {
+      setDraftName(node.name);
+    }
+  }, [isRenaming, node.name]);
+
+  function commitRename() {
+    const nextName = draftName.trim();
+    if (nextName.length > 0 && nextName !== node.name) {
+      onRenameNode(node.id, nextName);
+    }
+    onRenameNodeEnd();
+  }
 
   return (
     <div role="treeitem" aria-selected={isSelected} aria-expanded={hasChildren ? !isCollapsed : undefined}>
@@ -214,10 +255,49 @@ function ExportNodeRow({
           onChange={() => onToggleNodeSelection(node.id)}
         />
         <span className={`status-dot ${node.enabled ? 'enabled' : 'disabled'}`} aria-hidden="true" />
-        <button type="button" className="tree-row-main" onClick={() => onSelectNode(node.id)}>
-          <span className="tree-name">{node.name}</span>
-          <span className="tree-meta">{node.exportKind}</span>
-        </button>
+        {isRenaming ? (
+          <input
+            className="tree-row-rename-input"
+            value={draftName}
+            autoFocus
+            onChange={(event: InputChangeEvent) => setDraftName(event.target.value)}
+            onBlur={commitRename}
+            onKeyDown={(event: ExportTreeKeyDownEvent) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                commitRename();
+              }
+              if (event.key === 'Escape') {
+                event.preventDefault();
+                onRenameNodeEnd();
+              }
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            className="tree-row-main"
+            onClick={(event: ExportTreeMouseEvent) => {
+              onSelectNode(node.id, {
+                shiftKey: event.shiftKey,
+                ctrlKey: event.ctrlKey,
+                metaKey: event.metaKey,
+                orderedNodeIds
+              });
+            }}
+            onKeyDown={(event: ExportTreeKeyDownEvent) => {
+              if (event.key !== 'Enter' || selectedNodeIds.length !== 1 || !isChecked) {
+                return;
+              }
+
+              event.preventDefault();
+              onRenameNodeStart(node.id);
+            }}
+          >
+            <span className="tree-name">{node.name}</span>
+            <span className="tree-meta">{node.exportKind}</span>
+          </button>
+        )}
         <div className="tree-row-actions" aria-label={`${node.name} export node actions`}>
           <button
             type="button"
@@ -241,10 +321,15 @@ function ExportNodeRow({
           selectedNodeIds={selectedNodeIds}
           onDeleteNode={onDeleteNode}
           onDragNodeStart={onDragNodeStart}
+          onRenameNode={onRenameNode}
+          onRenameNodeStart={onRenameNodeStart}
           onSelectNode={onSelectNode}
           onToggleNodeEnabled={onToggleNodeEnabled}
           onToggleNodeSelection={onToggleNodeSelection}
           collapsedNodeIds={collapsedNodeIds}
+          orderedNodeIds={orderedNodeIds}
+          renamingNodeId={renamingNodeId}
+          onRenameNodeEnd={onRenameNodeEnd}
           onToggleNodeCollapse={onToggleNodeCollapse}
         />
       ))}
@@ -260,6 +345,27 @@ interface ExportTreePointerPosition {
 interface ExportTreePointerDownEvent {
   button: number;
   preventDefault: () => void;
+}
+
+type InputChangeEvent = { target: HTMLInputElement };
+type ExportTreeMouseEvent = {
+  shiftKey: boolean;
+  ctrlKey: boolean;
+  metaKey: boolean;
+};
+type ExportTreeKeyDownEvent = {
+  key: string;
+  preventDefault: () => void;
+};
+
+function collectVisibleExportNodeIds(nodes: ExportNode[], collapsedNodeIds: string[]): string[] {
+  return nodes.flatMap((node) => {
+    if (isTreeNodeCollapsed(collapsedNodeIds, node.id)) {
+      return [node.id];
+    }
+
+    return [node.id, ...collectVisibleExportNodeIds(node.children, collapsedNodeIds)];
+  });
 }
 
 function resolveDropPosition(

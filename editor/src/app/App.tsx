@@ -5,9 +5,11 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { CanvasPreview } from '../components/CanvasPreview';
 import { ExportTree } from '../components/ExportTree';
+import type { ExportTreeSelectEvent } from '../components/ExportTree';
 import { Inspector } from '../components/Inspector';
 import { SourceTree } from '../components/SourceTree';
 import { createProjectAutoSaveScheduler } from './auto-save';
+import { createEditorSettingsStore, type EditorSettings } from './editor-settings';
 import { createLayoutExportPackage } from '../domain/layout-export';
 import { resolveLayerImagePath } from '../domain/preview-assets';
 import { createEditorLayoutStore } from './editor-layout';
@@ -34,6 +36,7 @@ import {
 } from './recent-files';
 import {
   addSourceLayerToExportTree,
+  applyPrefixToSelectedExportNode,
   canMergeSelectedExportNodes,
   collectExportedSourceLayerIds,
   createEmptyState,
@@ -44,12 +47,14 @@ import {
   mergeSelectedExportNodes,
   moveExportNodeToDropTarget,
   removeExportNode,
+  selectExportNode,
   selectSourceLayer,
   toggleExportNodeSelection,
   toggleSourceLayerPreviewVisibility,
   unmergeExportNode,
   type SourceDocumentInput,
-  updateExportNode
+  updateExportNode,
+  wrapSelectedExportNodesWithParent
 } from './state';
 
 type InputChangeEvent = { target: HTMLInputElement };
@@ -80,6 +85,7 @@ type WorkspacePanelResizePointerEvent = {
 export function App() {
   const recentFilesStore = useMemo(() => createRecentFilesStore(window.localStorage), []);
   const editorLayoutStore = useMemo(() => createEditorLayoutStore(window.localStorage), []);
+  const editorSettingsStore = useMemo(() => createEditorSettingsStore(window.localStorage), []);
   const autoSaveScheduler = useMemo(
     () =>
       createProjectAutoSaveScheduler({
@@ -101,7 +107,9 @@ export function App() {
     [recentFilesStore]
   );
   const initialEditorLayout = useMemo(() => editorLayoutStore.load(), [editorLayoutStore]);
+  const initialEditorSettings = useMemo(() => editorSettingsStore.load(), [editorSettingsStore]);
   const [state, setState] = useState(createEmptyState);
+  const [editorSettings, setEditorSettings] = useState<EditorSettings>(initialEditorSettings);
   const [projectSettings, setProjectSettings] = useState<ProjectSettings>({
     projectPath: '',
     layoutPath: ''
@@ -163,6 +171,34 @@ export function App() {
   useEffect(() => {
     void restoreRecentFile();
   }, []);
+
+  useEffect(() => {
+    function handleKeyDown(event: KeyboardEvent) {
+      const target = event.target;
+      if (
+        target instanceof HTMLInputElement
+        || target instanceof HTMLTextAreaElement
+        || target instanceof HTMLSelectElement
+      ) {
+        return;
+      }
+
+      if ((!event.metaKey && !event.ctrlKey) || !/^[1-9]$/.test(event.key)) {
+        return;
+      }
+
+      const prefix = editorSettings.prefixShortcuts[Number(event.key) - 1] ?? '';
+      if (prefix.trim().length === 0) {
+        return;
+      }
+
+      event.preventDefault();
+      setState((current) => applyPrefixToSelectedExportNode(current, prefix));
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [editorSettings.prefixShortcuts]);
 
   useEffect(() => {
     const project = state.project;
@@ -377,6 +413,42 @@ export function App() {
     setState((current) => removeExportNode(current, nodeId));
   }
 
+  function selectExportNodeFromTree(nodeId: string, event: ExportTreeSelectEvent) {
+    const mode = event.shiftKey
+      ? 'range'
+      : event.ctrlKey || event.metaKey
+      ? 'toggle'
+      : 'single';
+
+    setState((current) =>
+      selectExportNode(current, nodeId, {
+        mode,
+        orderedNodeIds: event.orderedNodeIds
+      })
+    );
+  }
+
+  function renameExportNode(nodeId: string, name: string) {
+    setState((current) => updateExportNode(current, nodeId, { name }));
+  }
+
+  function wrapSelectedExportNodes() {
+    setState((current) => wrapSelectedExportNodesWithParent(current, `node_${Date.now().toString(36)}`));
+  }
+
+  function updatePrefixShortcut(index: number, prefix: string) {
+    setEditorSettings((current) => {
+      const nextSettings = {
+        ...current,
+        prefixShortcuts: current.prefixShortcuts.map((value, valueIndex) =>
+          valueIndex === index ? prefix : value
+        )
+      };
+      editorSettingsStore.save(nextSettings);
+      return nextSettings;
+    });
+  }
+
   function saveEditorLayout(
     nextTreePanelWidths: TreePanelWidths,
     nextWorkspacePanelWidths: WorkspacePanelWidths
@@ -406,6 +478,7 @@ export function App() {
   const hasProject = project !== null;
   const mergeCandidateExportNodeCount = getMergeCandidateExportNodeIds(state).length;
   const canMergeNodes = canMergeSelectedExportNodes(state);
+  const canWrapSelectedNodes = state.selectedExportNodeIds.length > 1;
 
   return (
     <>
@@ -451,6 +524,9 @@ export function App() {
                 <button type="button" onClick={mergeSelectedExportNodesFromTree} disabled={!canMergeNodes}>
                   Merge Export Nodes
                 </button>
+                <button type="button" onClick={wrapSelectedExportNodes} disabled={!canWrapSelectedNodes}>
+                  Add Parent Node
+                </button>
                 <button type="button" onClick={saveProject}>
                   Save .psdui
                 </button>
@@ -476,6 +552,22 @@ export function App() {
                     onChange={(layoutPath) => setProjectSettings((current) => ({ ...current, layoutPath }))}
                   />
                 </div>
+                <fieldset className="prefix-shortcut-settings">
+                  <legend>Prefix Shortcuts</legend>
+                  <div className="prefix-shortcut-grid">
+                    {editorSettings.prefixShortcuts.map((prefix, index) => (
+                      <label key={index} className="field">
+                        <span>{index + 1}</span>
+                        <input
+                          value={prefix}
+                          onChange={(event: InputChangeEvent) =>
+                            updatePrefixShortcut(index, event.target.value)
+                          }
+                        />
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
               </details>
               <p className="message" role="status">
                 {state.message ?? 'Ready.'}
@@ -568,9 +660,10 @@ export function App() {
                           })
                         )
                       }
-                      onSelectNode={(nodeId) =>
-                        setState((current) => ({ ...current, selectedExportNodeId: nodeId }))
+                      onSelectNode={(nodeId, event) =>
+                        selectExportNodeFromTree(nodeId, event)
                       }
+                      onRenameNode={renameExportNode}
                       onToggleNodeEnabled={(nodeId) =>
                         setState((current) =>
                           updateExportNode(current, nodeId, (node) => ({
@@ -874,6 +967,25 @@ button:disabled {
   margin-top: 10px;
 }
 
+.prefix-shortcut-settings {
+  margin: 12px 0 0;
+  padding: 10px;
+  border: 1px solid #d8dee8;
+  border-radius: 6px;
+}
+
+.prefix-shortcut-settings legend {
+  color: #526173;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.prefix-shortcut-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(80px, 1fr));
+  gap: 8px;
+}
+
 .toolbar > .message {
   grid-column: 1 / -1;
 }
@@ -1034,6 +1146,16 @@ h2 {
 
 .tree-row-main:hover {
   background: transparent;
+}
+
+.tree-row-rename-input {
+  width: 100%;
+  min-width: 0;
+  min-height: 28px;
+  border: 1px solid #7aa7e8;
+  border-radius: 5px;
+  padding: 3px 8px;
+  color: #17202c;
 }
 
 .icon-button {

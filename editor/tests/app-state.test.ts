@@ -7,14 +7,17 @@ import {
   createEmptyState,
   createExportNodeForSources,
   createProjectFromSourceDocument,
+  applyPrefixToSelectedExportNode,
   mergeSelectedExportNodes,
   moveExportNode,
   moveExportNodeToDropTarget,
   removeExportNode,
   selectSourceLayer,
+  selectExportNode,
   toggleExportNodeSelection,
   toggleSourceLayerPreviewVisibility,
   unmergeExportNode,
+  wrapSelectedExportNodesWithParent,
   type AppState
 } from '../src/app/state';
 import type { SourceLayer } from '../src/schemas/source';
@@ -46,6 +49,58 @@ describe('app state', () => {
     expect(first.selectedExportNodeIds).toEqual(['source_12']);
     expect(second.selectedExportNodeIds).toEqual(['source_12', 'source_13']);
     expect(third.selectedExportNodeIds).toEqual(['source_13']);
+  });
+
+  test('selects export nodes with file explorer style single toggle and range interactions', () => {
+    const state = {
+      ...createEmptyState(),
+      selectedExportNodeId: 'source_1',
+      selectedExportNodeIds: ['source_1']
+    };
+    const orderedNodeIds = ['source_1', 'source_2', 'source_3', 'source_4'];
+
+    const single = selectExportNode(state, 'source_2', { mode: 'single', orderedNodeIds });
+    const toggled = selectExportNode(single, 'source_4', { mode: 'toggle', orderedNodeIds });
+    const ranged = selectExportNode(single, 'source_4', { mode: 'range', orderedNodeIds });
+
+    expect(single.selectedExportNodeId).toBe('source_2');
+    expect(single.selectedExportNodeIds).toEqual(['source_2']);
+    expect(toggled.selectedExportNodeIds).toEqual(['source_2', 'source_4']);
+    expect(ranged.selectedExportNodeIds).toEqual(['source_2', 'source_3', 'source_4']);
+  });
+
+  test('applies configured prefixes to a single selected export node', () => {
+    const state = {
+      ...createEmptyState(),
+      selectedExportNodeId: 'source_1',
+      selectedExportNodeIds: ['source_1'],
+      project: {
+        version: 1 as const,
+        source: { path: '/tmp/menu.psb', fileName: 'menu.psb' },
+        document: { width: 320, height: 180 },
+        sourceTree: [],
+        exportTree: [
+          {
+            id: 'source_1',
+            name: 'Confirm',
+            exportKind: 'button',
+            enabled: true,
+            sourceLayerIds: [1],
+            rect: { x: 0, y: 0, width: 20, height: 10 },
+            rasterBounds: null,
+            list: null,
+            children: []
+          }
+        ],
+        cache: { assetsDir: 'layers' }
+      }
+    } satisfies AppState;
+
+    const renamed = applyPrefixToSelectedExportNode(state, 'Btn');
+    const unchanged = applyPrefixToSelectedExportNode(renamed, 'Btn');
+
+    expect(renamed.project?.exportTree[0]?.name).toBe('BtnConfirm');
+    expect(unchanged.project?.exportTree[0]?.name).toBe('BtnConfirm');
   });
 
   test('collects only enabled export source layer ids for export preview', () => {
@@ -591,6 +646,86 @@ describe('app state', () => {
       'source_1',
       'merged_button'
     ]);
+  });
+
+  test('wraps selected export nodes in a bounding-box parent node without moving children', () => {
+    const state = {
+      ...createEmptyState(),
+      selectedExportNodeIds: ['source_2', 'source_3'],
+      project: {
+        version: 1 as const,
+        source: {
+          path: '/tmp/menu.psb',
+          fileName: 'menu.psb'
+        },
+        document: {
+          width: 320,
+          height: 180
+        },
+        sourceTree: [],
+        exportTree: [
+          {
+            id: 'source_1',
+            name: 'A',
+            exportKind: 'image',
+            enabled: true,
+            sourceLayerIds: [1],
+            rect: { x: 0, y: 0, width: 10, height: 10 },
+            rasterBounds: { x: 0, y: 0, width: 10, height: 10 },
+            list: null,
+            children: []
+          },
+          {
+            id: 'source_2',
+            name: 'B',
+            exportKind: 'image',
+            enabled: true,
+            sourceLayerIds: [2],
+            rect: { x: 10, y: 20, width: 30, height: 20 },
+            rasterBounds: { x: 10, y: 20, width: 30, height: 20 },
+            list: null,
+            children: []
+          },
+          {
+            id: 'source_3',
+            name: 'C',
+            exportKind: 'text',
+            enabled: true,
+            sourceLayerIds: [3],
+            rect: { x: 50, y: 10, width: 20, height: 40 },
+            rasterBounds: null,
+            list: null,
+            children: []
+          }
+        ],
+        cache: {
+          assetsDir: 'layers'
+        }
+      }
+    } satisfies AppState;
+
+    const wrapped = wrapSelectedExportNodesWithParent(state, 'parent_1');
+
+    expect(wrapped.selectedExportNodeId).toBe('parent_1');
+    expect(wrapped.selectedExportNodeIds).toEqual(['parent_1']);
+    expect(wrapped.project?.exportTree.map((node) => node.id)).toEqual(['source_1', 'parent_1']);
+    expect(wrapped.project?.exportTree[1]).toMatchObject({
+      id: 'parent_1',
+      name: 'Node',
+      exportKind: 'Node',
+      rect: { x: 10, y: 10, width: 60, height: 40 },
+      anchor: { x: 0.5, y: 0.5 },
+      children: [
+        {
+          id: 'source_2',
+          rect: { x: 10, y: 20, width: 30, height: 20 }
+        },
+        {
+          id: 'source_3',
+          rect: { x: 50, y: 10, width: 20, height: 40 }
+        }
+      ]
+    });
   });
 
   test('moves export nodes among siblings', () => {

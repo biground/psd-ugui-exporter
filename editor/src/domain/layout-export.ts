@@ -102,6 +102,7 @@ function createLayoutNode(
     name: node.name,
     exportKind: node.exportKind,
     rect: copyRect(node.rect),
+    anchor: node.anchor === null || node.anchor === undefined ? null : { ...node.anchor },
     rasterBounds: node.rasterBounds === null ? null : copyRect(node.rasterBounds),
     sourceLayerIds: [...node.sourceLayerIds],
     asset,

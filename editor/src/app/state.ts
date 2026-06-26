@@ -19,11 +19,17 @@ export type SourceDocumentInput = Omit<PSDUIProject, 'exportTree' | 'cache'> & {
 type ExportNodeUpdater = Partial<ExportNode> | ((node: ExportNode) => ExportNode);
 export type MoveDirection = 'up' | 'down';
 export type ExportNodeDropPosition = 'before' | 'inside' | 'after';
+export type ExportNodeSelectionMode = 'single' | 'toggle' | 'range';
 
 export interface ExportNodeDropTarget {
   draggedNodeId: string;
   targetNodeId: string;
   position: ExportNodeDropPosition;
+}
+
+export interface ExportNodeSelectionOptions {
+  mode: ExportNodeSelectionMode;
+  orderedNodeIds: string[];
 }
 
 export function createEmptyState(): AppState {
@@ -53,6 +59,62 @@ export function toggleExportNodeSelection(state: AppState, nodeId: string): AppS
       ? state.selectedExportNodeIds.filter((selectedNodeId) => selectedNodeId !== nodeId)
       : [...state.selectedExportNodeIds, nodeId]
   };
+}
+
+export function selectExportNode(
+  state: AppState,
+  nodeId: string,
+  options: ExportNodeSelectionOptions
+): AppState {
+  if (options.mode === 'single') {
+    return {
+      ...state,
+      selectedExportNodeId: nodeId,
+      selectedExportNodeIds: [nodeId]
+    };
+  }
+
+  if (options.mode === 'toggle') {
+    const isSelected = state.selectedExportNodeIds.includes(nodeId);
+    const nextSelectedNodeIds = isSelected
+      ? state.selectedExportNodeIds.filter((selectedNodeId) => selectedNodeId !== nodeId)
+      : [...state.selectedExportNodeIds, nodeId];
+
+    return {
+      ...state,
+      selectedExportNodeId: nextSelectedNodeIds.at(-1) ?? null,
+      selectedExportNodeIds: nextSelectedNodeIds
+    };
+  }
+
+  const anchorNodeId = state.selectedExportNodeId ?? state.selectedExportNodeIds[0] ?? nodeId;
+  const rangeNodeIds = resolveExportNodeSelectionRange(
+    options.orderedNodeIds,
+    anchorNodeId,
+    nodeId
+  );
+
+  return {
+    ...state,
+    selectedExportNodeId: nodeId,
+    selectedExportNodeIds: rangeNodeIds
+  };
+}
+
+export function applyPrefixToSelectedExportNode(state: AppState, prefix: string): AppState {
+  const selectedNodeIds = getMergeCandidateExportNodeIds(state);
+  const normalizedPrefix = prefix.trim();
+
+  if (state.project === null || selectedNodeIds.length !== 1 || normalizedPrefix.length === 0) {
+    return state;
+  }
+
+  return updateExportNode(state, selectedNodeIds[0]!, (node) => ({
+    ...node,
+    name: node.name.startsWith(normalizedPrefix)
+      ? node.name
+      : `${normalizedPrefix}${node.name}`
+  }));
 }
 
 export function toggleSourceLayerPreviewVisibility(state: AppState, layerId: number): AppState {
@@ -291,6 +353,56 @@ export function unmergeExportNode(state: AppState, nodeId: string): AppState {
   };
 }
 
+export function wrapSelectedExportNodesWithParent(state: AppState, id: string): AppState {
+  if (state.project === null || state.selectedExportNodeIds.length < 2) {
+    return {
+      ...state,
+      message: 'Select at least two export nodes before adding a parent node.'
+    };
+  }
+
+  const selectedNodeIds = new Set(state.selectedExportNodeIds);
+  const selectedNodes = flattenExportNodes(state.project.exportTree).filter((node) =>
+    selectedNodeIds.has(node.id)
+  );
+
+  if (selectedNodes.length < 2) {
+    return {
+      ...state,
+      message: 'Select at least two export nodes before adding a parent node.'
+    };
+  }
+
+  const parentNode = normalizeExportNode({
+    id,
+    name: 'Node',
+    exportKind: 'Node',
+    enabled: true,
+    sourceLayerIds: [],
+    rect: unionRects(selectedNodes.map((node) => node.rect)),
+    anchor: { x: 0.5, y: 0.5 },
+    rasterBounds: null,
+    list: null,
+    scale9: null,
+    children: selectedNodes.map(cloneExportNode)
+  });
+
+  return {
+    ...state,
+    project: {
+      ...state.project,
+      exportTree: replaceExportNodesWithMergedNode(
+        state.project.exportTree,
+        selectedNodeIds,
+        parentNode
+      )
+    },
+    selectedExportNodeId: parentNode.id,
+    selectedExportNodeIds: [parentNode.id],
+    message: `Added parent node "${parentNode.name}".`
+  };
+}
+
 export function updateExportNode(state: AppState, nodeId: string, updater: ExportNodeUpdater): AppState {
   if (state.project === null) {
     return state;
@@ -434,6 +546,24 @@ function collectEnabledExportNodeSourceLayerIds(
 
 function isSourceLayerAlreadyExported(exportTree: ExportNode[], layerId: number): boolean {
   return collectExportedSourceLayerIds(exportTree).includes(layerId);
+}
+
+function resolveExportNodeSelectionRange(
+  orderedNodeIds: string[],
+  anchorNodeId: string,
+  targetNodeId: string
+): string[] {
+  const anchorIndex = orderedNodeIds.indexOf(anchorNodeId);
+  const targetIndex = orderedNodeIds.indexOf(targetNodeId);
+
+  if (anchorIndex < 0 || targetIndex < 0) {
+    return [targetNodeId];
+  }
+
+  const start = Math.min(anchorIndex, targetIndex);
+  const end = Math.max(anchorIndex, targetIndex);
+
+  return orderedNodeIds.slice(start, end + 1);
 }
 
 function updateExportTree(
@@ -596,6 +726,7 @@ function cloneExportNode(node: ExportNode): ExportNode {
   return {
     ...node,
     rect: { ...node.rect },
+    anchor: node.anchor === null || node.anchor === undefined ? null : { ...node.anchor },
     rasterBounds: node.rasterBounds === null ? null : { ...node.rasterBounds },
     list: node.list === null
       ? null

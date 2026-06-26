@@ -36,6 +36,7 @@ export interface ExportNode {
   enabled: boolean;
   sourceLayerIds: number[];
   rect: Rect;
+  anchor?: { x: number; y: number } | null;
   rasterBounds: Rect | null;
   list: ListSettings | null;
   scale9?: Scale9Settings | null;
