@@ -10,6 +10,12 @@ import { Inspector } from '../components/Inspector';
 import { SourceTree } from '../components/SourceTree';
 import { createProjectAutoSaveScheduler } from './auto-save';
 import { createEditorSettingsStore, type EditorSettings } from './editor-settings';
+import {
+  createEmptyProjectHistory,
+  recordProjectHistory,
+  redoProject,
+  undoProject
+} from './project-history';
 import { createLayoutExportPackage } from '../domain/layout-export';
 import { resolveLayerImagePath } from '../domain/preview-assets';
 import { createEditorLayoutStore } from './editor-layout';
@@ -52,6 +58,7 @@ import {
   toggleExportNodeSelection,
   toggleSourceLayerPreviewVisibility,
   unmergeExportNode,
+  type AppState,
   type SourceDocumentInput,
   updateExportNode,
   wrapSelectedExportNodesWithParent
@@ -109,11 +116,13 @@ export function App() {
   const initialEditorLayout = useMemo(() => editorLayoutStore.load(), [editorLayoutStore]);
   const initialEditorSettings = useMemo(() => editorSettingsStore.load(), [editorSettingsStore]);
   const [state, setState] = useState(createEmptyState);
+  const [projectHistory, setProjectHistory] = useState(createEmptyProjectHistory);
   const [editorSettings, setEditorSettings] = useState<EditorSettings>(initialEditorSettings);
   const [projectSettings, setProjectSettings] = useState<ProjectSettings>({
     projectPath: '',
     layoutPath: ''
   });
+  const [renamingExportNodeId, setRenamingExportNodeId] = useState<string | null>(null);
   const [projectSettingsOpen, setProjectSettingsOpen] = useState(false);
   const [newExportKind, setNewExportKind] = useState<ExportKind>('image');
   const [treePanelWidths, setTreePanelWidths] = useState<TreePanelWidths>(
@@ -183,6 +192,53 @@ export function App() {
         return;
       }
 
+      const isUndoOrRedo =
+        (event.metaKey || event.ctrlKey)
+        && !event.altKey
+        && event.key.toLowerCase() === 'z';
+
+      if (isUndoOrRedo) {
+        event.preventDefault();
+        const result = event.shiftKey
+          ? redoProject(projectHistory, state.project)
+          : undoProject(projectHistory, state.project);
+
+        if (result === null) {
+          return;
+        }
+
+        setProjectHistory(result.history);
+        setRenamingExportNodeId(null);
+        setState((current) => ({
+          ...current,
+          project: result.project,
+          ...reconcileExportSelection(current, result.project),
+          message: event.shiftKey ? 'Redid last edit.' : 'Undid last edit.'
+        }));
+        return;
+      }
+
+      if (
+        event.key === 'Enter'
+        && !event.metaKey
+        && !event.ctrlKey
+        && !event.altKey
+      ) {
+        const nodeId = getSingleSelectedExportNodeId(state);
+
+        if (
+          nodeId === null
+          || state.project === null
+          || findExportNodeById(state.project.exportTree, nodeId) === null
+        ) {
+          return;
+        }
+
+        event.preventDefault();
+        setRenamingExportNodeId(nodeId);
+        return;
+      }
+
       if ((!event.metaKey && !event.ctrlKey) || !/^[1-9]$/.test(event.key)) {
         return;
       }
@@ -193,12 +249,12 @@ export function App() {
       }
 
       event.preventDefault();
-      setState((current) => applyPrefixToSelectedExportNode(current, prefix));
+      editProjectState((current) => applyPrefixToSelectedExportNode(current, prefix));
     }
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [editorSettings.prefixShortcuts]);
+  }, [editorSettings.prefixShortcuts, projectHistory, state]);
 
   useEffect(() => {
     const project = state.project;
@@ -223,6 +279,14 @@ export function App() {
         message: error instanceof Error ? error.message : String(error)
       }));
     }
+  }
+
+  function editProjectState(updater: (current: AppState) => AppState) {
+    setState((current) => {
+      const next = updater(current);
+      setProjectHistory((history) => recordProjectHistory(history, current.project, next.project));
+      return next;
+    });
   }
 
   async function restoreRecentFile() {
@@ -330,6 +394,8 @@ export function App() {
   }
 
   function openProjectInEditor(project: PSDUIProject, message: string, projectPath?: string) {
+    setProjectHistory(createEmptyProjectHistory());
+    setRenamingExportNodeId(null);
     setProjectSettings({
       ...deriveDefaultProjectSettings(project.source.path),
       ...(projectPath === undefined ? {} : { projectPath })
@@ -347,7 +413,7 @@ export function App() {
   }
 
   function mergeSelectedExportNodesFromTree() {
-    setState((current) => {
+    editProjectState((current) => {
       return mergeSelectedExportNodes(
         current,
         `export_${Date.now().toString(36)}`,
@@ -398,19 +464,19 @@ export function App() {
       return;
     }
 
-    setState((current) => updateExportNode(current, nodeId, patch));
+    editProjectState((current) => updateExportNode(current, nodeId, patch));
   }
 
   function unmergeSelectedExportNode(nodeId: string) {
-    setState((current) => unmergeExportNode(current, nodeId));
+    editProjectState((current) => unmergeExportNode(current, nodeId));
   }
 
   function addSourceLayerExportNode(layerId: number) {
-    setState((current) => addSourceLayerToExportTree(current, layerId));
+    editProjectState((current) => addSourceLayerToExportTree(current, layerId));
   }
 
   function deleteExportNode(nodeId: string) {
-    setState((current) => removeExportNode(current, nodeId));
+    editProjectState((current) => removeExportNode(current, nodeId));
   }
 
   function selectExportNodeFromTree(nodeId: string, event: ExportTreeSelectEvent) {
@@ -429,11 +495,13 @@ export function App() {
   }
 
   function renameExportNode(nodeId: string, name: string) {
-    setState((current) => updateExportNode(current, nodeId, { name }));
+    editProjectState((current) => updateExportNode(current, nodeId, { name }));
   }
 
   function wrapSelectedExportNodes() {
-    setState((current) => wrapSelectedExportNodesWithParent(current, `node_${Date.now().toString(36)}`));
+    editProjectState((current) =>
+      wrapSelectedExportNodesWithParent(current, `node_${Date.now().toString(36)}`)
+    );
   }
 
   function updatePrefixShortcut(index: number, prefix: string) {
@@ -648,11 +716,12 @@ export function App() {
                     <h2>Export Tree</h2>
                     <ExportTree
                       nodes={project.exportTree}
+                      renamingNodeId={renamingExportNodeId}
                       selectedNodeId={state.selectedExportNodeId}
                       selectedNodeIds={state.selectedExportNodeIds}
                       onDeleteNode={deleteExportNode}
                       onDropNode={(draggedNodeId, targetNodeId, position) =>
-                        setState((current) =>
+                        editProjectState((current) =>
                           moveExportNodeToDropTarget(current, {
                             draggedNodeId,
                             targetNodeId,
@@ -664,8 +733,10 @@ export function App() {
                         selectExportNodeFromTree(nodeId, event)
                       }
                       onRenameNode={renameExportNode}
+                      onRenameNodeStart={setRenamingExportNodeId}
+                      onRenameNodeEnd={() => setRenamingExportNodeId(null)}
                       onToggleNodeEnabled={(nodeId) =>
-                        setState((current) =>
+                        editProjectState((current) =>
                           updateExportNode(current, nodeId, (node) => ({
                             ...node,
                             enabled: !node.enabled
@@ -759,6 +830,42 @@ export function App() {
 
 function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+function getSingleSelectedExportNodeId(state: AppState): string | null {
+  if (state.selectedExportNodeIds.length === 1) {
+    return state.selectedExportNodeIds[0] ?? null;
+  }
+
+  if (state.selectedExportNodeIds.length === 0) {
+    return state.selectedExportNodeId;
+  }
+
+  return null;
+}
+
+function reconcileExportSelection(
+  current: AppState,
+  project: PSDUIProject
+): Pick<AppState, 'selectedExportNodeId' | 'selectedExportNodeIds'> {
+  const selectedExportNodeIds = current.selectedExportNodeIds.filter(
+    (nodeId) => findExportNodeById(project.exportTree, nodeId) !== null
+  );
+  const selectedExportNodeId =
+    current.selectedExportNodeId !== null
+    && findExportNodeById(project.exportTree, current.selectedExportNodeId) !== null
+      ? current.selectedExportNodeId
+      : selectedExportNodeIds[0] ?? project.exportTree[0]?.id ?? null;
+
+  return {
+    selectedExportNodeId,
+    selectedExportNodeIds:
+      selectedExportNodeIds.length > 0
+        ? selectedExportNodeIds
+        : selectedExportNodeId === null
+        ? []
+        : [selectedExportNodeId]
+  };
 }
 
 interface PathInputProps {

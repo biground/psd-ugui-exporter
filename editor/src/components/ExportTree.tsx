@@ -8,11 +8,14 @@ type ExportNodeDropPosition = 'before' | 'inside' | 'after';
 
 interface ExportTreeProps {
   nodes: ExportNode[];
+  renamingNodeId: string | null;
   selectedNodeId: string | null;
   selectedNodeIds: string[];
   onDeleteNode: (nodeId: string) => void;
   onDropNode: (draggedNodeId: string, targetNodeId: string, position: ExportNodeDropPosition) => void;
   onRenameNode: (nodeId: string, name: string) => void;
+  onRenameNodeEnd: () => void;
+  onRenameNodeStart: (nodeId: string) => void;
   onSelectNode: (nodeId: string, event: ExportTreeSelectEvent) => void;
   onToggleNodeEnabled: (nodeId: string) => void;
   onToggleNodeSelection: (nodeId: string) => void;
@@ -27,11 +30,14 @@ export interface ExportTreeSelectEvent {
 
 export function ExportTree({
   nodes,
+  renamingNodeId,
   selectedNodeId,
   selectedNodeIds,
   onDeleteNode,
   onDropNode,
   onRenameNode,
+  onRenameNodeEnd,
+  onRenameNodeStart,
   onSelectNode,
   onToggleNodeEnabled,
   onToggleNodeSelection
@@ -40,7 +46,6 @@ export function ExportTree({
   const [collapsedNodeIds, setCollapsedNodeIds] = useState<string[]>([]);
   const [draggedNodeId, setDraggedNodeId] = useState<string | null>(null);
   const [dragTarget, setDragTarget] = useState<ExportTreeDragTarget | null>(null);
-  const [renamingNodeId, setRenamingNodeId] = useState<string | null>(null);
   const dragTargetRef = useRef<ExportTreeDragTarget | null>(null);
   const orderedNodeIds = collectVisibleExportNodeIds(nodes, collapsedNodeIds);
 
@@ -110,14 +115,14 @@ export function ExportTree({
           onDeleteNode={onDeleteNode}
           onDragNodeStart={setDraggedNodeId}
           onRenameNode={onRenameNode}
-          onRenameNodeStart={setRenamingNodeId}
+          onRenameNodeStart={onRenameNodeStart}
           onSelectNode={onSelectNode}
           onToggleNodeEnabled={onToggleNodeEnabled}
           onToggleNodeSelection={onToggleNodeSelection}
           collapsedNodeIds={collapsedNodeIds}
           orderedNodeIds={orderedNodeIds}
           renamingNodeId={renamingNodeId}
-          onRenameNodeEnd={() => setRenamingNodeId(null)}
+          onRenameNodeEnd={onRenameNodeEnd}
           onToggleNodeCollapse={(nodeId) =>
             setCollapsedNodeIds((current) => toggleCollapsedNodeId(current, nodeId))
           }

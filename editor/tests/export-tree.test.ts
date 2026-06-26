@@ -109,4 +109,10 @@ describe('ExportTree component', () => {
     expect(exportTree).not.toContain('Move up');
     expect(exportTree).not.toContain('Move down');
   });
+
+  test('keeps inline rename controlled by the app for global shortcuts', () => {
+    expect(exportTree).toContain('renamingNodeId: string | null');
+    expect(exportTree).toContain('onRenameNodeStart: (nodeId: string) => void');
+    expect(exportTree).not.toContain('const [renamingNodeId, setRenamingNodeId]');
+  });
 });
